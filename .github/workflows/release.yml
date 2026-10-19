@@ -1,0 +1,81 @@
+name: Release
+
+# Publishes a GitHub Release with the .xpi when manifest.json has a version
+# that has no tag yet. Flow: bump manifest.json + CHANGELOG.md → merge to main.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./manifest.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "Tag v$VERSION already exists: nothing to release."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v6
+        if: steps.version.outputs.exists == 'false'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dev tools
+        if: steps.version.outputs.exists == 'false'
+        run: npm ci
+
+      - name: Tests
+        if: steps.version.outputs.exists == 'false'
+        run: npm test
+
+      - name: Lint
+        if: steps.version.outputs.exists == 'false'
+        run: npm run lint
+
+      - name: Build .xpi
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          npm run build
+          cd dist
+          sha256sum "incobills-${{ steps.version.outputs.version }}.xpi" > "incobills-${{ steps.version.outputs.version }}.xpi.sha256"
+          ls -l
+
+      - name: Release notes from CHANGELOG.md
+        if: steps.version.outputs.exists == 'false'
+        run: node scripts/changelog-section.js "${{ steps.version.outputs.version }}" > release-notes.md
+
+      - name: Publish GitHub Release
+        if: steps.version.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" \
+            "dist/incobills-$VERSION.xpi" \
+            "dist/incobills-$VERSION.xpi.sha256" \
+            --title "IncoBills $VERSION" \
+            --notes-file release-notes.md \
+            --target "$GITHUB_SHA"

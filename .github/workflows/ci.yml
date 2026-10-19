@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dev tools
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Lint (web-ext / addons-linter)
+        run: npm run lint
+
+      - name: Build .xpi
+        run: npm run build
+
+      - name: Upload .xpi (for testing this change)
+        uses: actions/upload-artifact@v6
+        with:
+          name: incobills-xpi
+          path: dist/*.xpi
+          retention-days: 14

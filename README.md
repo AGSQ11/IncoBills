@@ -2,7 +2,7 @@
 
 # IncoBills — AI-Powered Invoice Detection for Thunderbird
 
-A Thunderbird MailExtension that monitors all incoming emails, classifies them with AI (or local keyword heuristics), and automatically organizes invoice-related messages into monthly subfolders — so you never miss an invoice again.
+A Thunderbird MailExtension that classifies incoming email with AI (or local keyword heuristics), moves invoice emails into monthly folders, and — for Romanian companies — turns invoices into **SAGA** XML import files.
 
 Built by [ServerSpan](https://www.serverspan.com/en/) — the hosting company where real sysadmins answer your tickets.
 
@@ -12,14 +12,26 @@ Built by [ServerSpan](https://www.serverspan.com/en/) — the hosting company wh
 
 ## Features
 
-- **AI Classification** — Plug in Claude, OpenAI, or a local Ollama model to classify emails with high accuracy. Falls back to built-in keyword heuristics automatically if the API is unreachable.
-- **Automatic Organization** — Detected invoices are moved (or copied) into `Invoices/YYYY-MM` subfolders, neatly grouped by month for easy accounting.
-- **Per-Account or Unified** — Choose to keep invoices in each mailbox separately, or funnel them all into a single account.
-- **Move or Copy** — Decide whether invoices are removed from the original folder or kept as a copy.
-- **Works Across All Accounts** — Monitors every IMAP and POP3 account in Thunderbird. No server credentials needed — the extension runs entirely inside Thunderbird.
-- **Privacy First** — Only the first 1000 characters of email body are sent to AI APIs. Full content never leaves the extension. For total privacy, use the local Ollama or keyword-only backends.
-- **Scan Existing Emails** — Retroactively scan your inbox for invoices you may have missed before installing IncoBills.
-- **Classification History** — Every decision is logged with confidence score, reason, and backend used. Export as CSV for your records.
+- **AI classification** — Claude, OpenAI (or any OpenAI-compatible server), or a local Ollama model. Structured output, timeouts and retries on every call.
+- **Hybrid mode** (default) — emails with no invoice signal and very clear invoices are decided by keywords, without an AI call. Much lower API cost.
+- **Automatic organization** — invoices go to `Invoices/YYYY-MM`, per account or in one unified account. Move, copy, or notify only.
+- **Learns from you** — right-click a message → *IncoBills: Mark as invoice* / *Not an invoice*. IncoBills remembers the sender and undoes its own move.
+- **Scan existing mail** — count and token estimate first, live progress, cancel. Sent, Drafts, Trash, Junk, Templates and the invoice folder are skipped.
+- **Classification history** — confidence, reason and source of every decision. CSV export.
+- **Backend health** — a notification and a banner when AI calls keep failing, instead of a silent fallback.
+- **English and Romanian UI.**
+
+### SAGA Export (Romania, optional)
+
+Turns on when you add at least one of your companies.
+
+- **e-Factura first** — UBL XML attachments and ANAF SPV ZIP files are read exactly, with no AI and no upload.
+- **PDF invoices** — extracted by Claude/OpenAI (native PDF input, only after your explicit consent) or locally with Ollama (text read by the bundled pdf.js).
+- **ANAF lookup** — partner name, address, trade register number, VAT status (correct `RO` prefix), *TVA la încasare* and inactive status from the public ANAF registry. Only the CIF and the invoice date are sent.
+- **Validation** — line sums, VAT sums, totals, CIF check digit, IBAN, dates and VAT rates (21% since 2025-08-01). Problems block the export until you fix them.
+- **Review editor** — edit header, parties and lines, then mark the invoice as reviewed.
+- **Duplicates** — the same supplier + invoice number + date is never queued twice.
+- **Export** — one SAGA XML per invoice in `Downloads/SAGA-Import/`.
 
 ## Screenshots
 
@@ -27,149 +39,148 @@ Built by [ServerSpan](https://www.serverspan.com/en/) — the hosting company wh
 |:---:|:---:|:---:|
 | ![Toolbar Button](screenshots/toolbar-button.png) | ![Popup](screenshots/popup.png) | ![Settings](screenshots/options-page.png) |
 
-*Click the IncoBills icon in Thunderbird's toolbar to open the popup, then click **Settings** to configure your AI backend and detection preferences.*
-
 ## Installation
 
-### Temporary Install (for testing)
+**From Thunderbird Add-ons (auto-updates):** open [IncoBills on Thunderbird Add-ons](https://addons.thunderbird.net/en-US/thunderbird/addon/incobills/) and click **Add to Thunderbird**.
 
-1. Open Thunderbird
-2. Go to **Menu → Add-ons and Themes** (or `Ctrl+Shift+A`)
-3. Click the gear icon → **Debug Add-ons** → **Load Temporary Add-on**
-4. Select `manifest.json` from this repository
+**From GitHub Releases:** download `incobills-x.y.z.xpi` from [Releases](../../releases), then in Thunderbird: **Add-ons and Themes → gear icon → Install Add-on From File**. Thunderbird does not require Mozilla signing for add-ons installed from a file.
 
-> Temporary add-ons are removed when Thunderbird closes.
+**Temporary install (development):** **Add-ons and Themes → gear icon → Debug Add-ons → Load Temporary Add-on**, then select `manifest.json`.
 
-### Permanent Install (Recommended)
-
-**From Thunderbird Add-ons (auto-updates):**
-
-1. Visit [IncoBills on Thunderbird Add-ons](https://addons.thunderbird.net/en-US/thunderbird/addon/incobills/)
-2. Click **Add to Thunderbird**
-
-**From GitHub Releases (manual):**
-
-1. Download the latest `incobills-x.x.x.xpi` from [Releases](../../releases)
-2. In Thunderbird: **Add-ons → Gear → Install Add-on From File**
-3. Select the downloaded `.xpi` file
-
-> **Note:** Thunderbird requires extensions to be signed by Mozilla for permanent installation on Release channel. For Nightly/Daily builds, you can set `xpinstall.signatures.required` to `false` in the Config Editor.
+Requires Thunderbird 128 or newer.
 
 ## Configuration
 
 Click the IncoBills toolbar icon → **Settings**.
 
-### AI Backend
+| Backend | Setup | Privacy |
+|---------|-------|---------|
+| **Claude API** (recommended) | Anthropic API key | Sender, subject, attachment names, first 1000 characters of the body |
+| **OpenAI API** | OpenAI API key (or an OpenAI-compatible server URL) | Same as Claude |
+| **Local Ollama** | [Install Ollama](https://ollama.com), start it with `OLLAMA_ORIGINS="moz-extension://*"` | Fully local |
+| **Keywords only** | None | Fully local |
 
-| Backend | Setup | Cost | Privacy |
-|---------|-------|------|---------|
-| **Claude API** (recommended) | Anthropic API key | ~$1/month at typical volume | First 1000 chars only |
-| **OpenAI API** | OpenAI API key | ~$1/month at typical volume | First 1000 chars only |
-| **Local Ollama** | [Install Ollama](https://ollama.com), set `OLLAMA_ORIGINS="*,moz-extension://*"` | Free | Fully local |
-| **Keywords Only** | No setup required | Free | Fully local |
+- Each AI backend has two models: one for **classification** (small, cheap) and one for **invoice extraction** (SAGA; more accurate).
+- A **custom API URL** (proxy, LiteLLM, a LAN Ollama) asks for a host permission when you click **Save**.
+- **Ollama:** do not use `OLLAMA_ORIGINS="*"` — it lets every website you visit use your local Ollama.
 
-Both Claude and OpenAI support custom API URLs — useful if you're running through a proxy or compatible endpoint.
+## Privacy
 
-### Folder Settings
+- **Classification:** sender, subject, attachment names and the first 1000 characters of the body go to the selected AI backend. With hybrid mode, many emails need no AI call at all. Ollama and keywords stay on your computer.
+- **SAGA PDF extraction:** the **full PDF attachment** goes to Claude/OpenAI — only after you tick the consent box in the SAGA settings. Invoices can contain personal data (GDPR). Without consent, use Ollama.
+- **e-Factura XML:** parsed locally, never uploaded.
+- **ANAF lookup:** only the CIF number and a date go to `webservicesp.anaf.ro`. You can turn it off.
+- API keys are stored in Thunderbird's extension storage on your computer.
 
-- **Folder name**: Root folder name (default: `Invoices`)
-- **Folder mode**: Per account (each mailbox gets its own tree) or unified (all go to one mailbox)
-- **Monthly subfolders**: Automatically created as `YYYY-MM` (e.g. `2026-04`) inside the root folder
+## Permissions
 
-### Action
-
-- **Move**: Removes the email from the original folder, places it in Invoices
-- **Copy**: Keeps the email in the original folder, creates a duplicate in Invoices
+| Permission | Why |
+|-----------|-----|
+| `messagesRead`, `messagesMove` | Read new mail, move/copy invoices |
+| `accountsRead`, `accountsFolders` | List accounts, create the invoice folders |
+| `menus` | Right-click *Mark as invoice / Not an invoice* |
+| `notifications` | Invoice and backend alerts |
+| `storage` | Settings, history, SAGA queue |
+| `downloads` | Save SAGA XML files |
+| `api.anthropic.com`, `api.openai.com`, `127.0.0.1`, `localhost`, `webservicesp.anaf.ro` | AI backends, local Ollama, ANAF registry |
+| optional `*://*/*` | Requested only for a custom API URL you enter |
 
 ## How It Works
 
 ```
-New email arrives in Thunderbird
-         │
-         ▼
-onNewMailReceived event fires
-         │
-         ▼
-Extract metadata (subject, sender, body snippet, attachment filenames)
-         │
-         ▼
-AI Classifier ──or── Keyword Heuristics (fallback)
-         │
-         ▼
-Confidence ≥ threshold?
-    │           │
-   YES          NO
-    │           │
-    ▼        Log & skip
-Find/create
-Invoices/YYYY-MM
-    │
-    ▼
-Move or Copy
-    │
-    ▼
-Desktop notification
+New mail (or a scan, or right-click "Mark as invoice")
+        │
+        ▼
+Sender rule? ──yes──► use it
+        │ no
+        ▼
+Keyword score ──(hybrid: 0 or ≥ 0.9)──► decide without AI
+        │ unsure
+        ▼
+AI backend (timeout + retry) ──fails──► keyword fallback + health alert
+        │
+        ▼
+Confidence ≥ threshold? ──no──► log, skip
+        │ yes
+        ▼
+Read invoice attachments ─► Move/copy to Invoices/YYYY-MM ─► notification
+        │
+        ▼  (SAGA, if a company is configured)
+e-Factura XML/ZIP ─► exact data          PDF ─► AI extraction (consent) / Ollama + pdf.js
+        └──────────────┬──────────────────────┘
+                       ▼
+        Company match + direction ─► ANAF data ─► validation ─► queue
+                       ▼
+               Review (if needed) ─► SAGA XML export
 ```
 
-## Building from Source
+## Development
 
-IncoBills is plain JavaScript — no build step, no bundler, no npm.
+The add-on itself is plain JavaScript with no build step. Node.js 22+ is used only for tests, lint and packaging.
 
 ```bash
 git clone https://github.com/serverspan/incobills.git
 cd incobills
+npm install
+npm test          # unit and integration tests (mocked Thunderbird API)
+npm run lint      # web-ext / addons-linter
+npm run build     # dist/incobills-<version>.xpi
 ```
 
-Load `manifest.json` as a temporary add-on in Thunderbird. That's it.
+`vendor/pdfjs` holds an unmodified copy of `pdfjs-dist` (legacy build). To update it: change the version in `package.json`, run `npm install`, then `npm run vendor:pdfjs`. A test checks that the vendored files match the package.
 
-To package as `.xpi`:
+## Releases
 
-```bash
-zip -r incobills-1.0.0.xpi manifest.json shared/ background/ popup/ options/ icons/
-```
+Releases are automatic:
 
-## Tech Stack
+1. Bump `version` in `manifest.json` and add a `## [x.y.z]` section to `CHANGELOG.md`.
+2. Merge to `main`.
+3. The **Release** workflow runs tests and lint, builds `incobills-x.y.z.xpi`, and publishes a GitHub Release `vx.y.z` with the `.xpi`, a SHA-256 checksum and the changelog section as notes.
 
-- **Thunderbird MailExtensions API** (Manifest V2, targeting TB 128+)
-- **Vanilla JavaScript** — zero dependencies, zero build step
-- **Pluggable AI backends** — Claude, OpenAI, Ollama, or keywords
+If the tag already exists, the workflow does nothing. You can also run it by hand from the Actions tab (**Run workflow**).
 
 ## Project Structure
 
 ```
 incobills/
 ├── manifest.json
+├── _locales/{en,ro}/messages.json
 ├── background/
-│   ├── background.js              # Entry point — listeners & message handling
-│   ├── email-monitor.js           # New mail handler & metadata extraction
-│   ├── classifier.js              # Dispatcher with automatic fallback
-│   ├── classifiers/
-│   │   ├── claude.js              # Anthropic Claude API
-│   │   ├── openai.js              # OpenAI Chat Completions API
-│   │   ├── ollama.js              # Local Ollama (fully private)
-│   │   └── keywords.js            # Heuristic fallback (zero setup)
-│   ├── folder-manager.js          # Folder creation with fallback chain
-│   └── history.js                 # Classification history & CSV export
-├── popup/
-│   ├── popup.html / .js / .css    # Toolbar popup
-├── options/
-│   ├── options.html / .js / .css  # Full settings page
-├── shared/
-│   ├── constants.js               # Defaults, keyword lists, AI prompts
-│   └── storage.js                 # browser.storage.local wrapper
-└── icons/                         # SVG icons (16/32/48/96px)
+│   ├── background.js            # Entry point: listeners, message router
+│   ├── email-monitor.js         # New mail, scans, metadata
+│   ├── classifier.js            # Rules → keywords → hybrid → AI → fallback
+│   ├── classifiers/keywords.js  # Offline heuristics (diacritics-aware)
+│   ├── llm.js                   # One provider layer: Claude / OpenAI / Ollama
+│   ├── http.js                  # fetch with timeout + retry
+│   ├── folder-manager.js        # Invoices/YYYY-MM folders
+│   ├── history.js               # History + processed set (Message-ID)
+│   ├── sender-rules.js          # Rules from the right-click menu
+│   ├── menus.js                 # Right-click menu
+│   └── saga/
+│       ├── saga-export.js       # Pipeline, queue, review, export
+│       ├── efactura.js          # UBL / SPV ZIP reader
+│       ├── pdf-extractor.js     # AI extraction, pdf.js text
+│       ├── anaf.js              # Public ANAF registry
+│       ├── validator.js         # Checks before export
+│       ├── company-registry.js  # Your companies
+│       └── xml-generator.js     # SAGA XML
+├── shared/                      # constants, storage, text, fiscal, i18n
+├── popup/  options/             # UI
+├── vendor/pdfjs/                # pdf.js (unmodified)
+├── tests/                       # node:test suites + fixtures
+└── .github/workflows/           # CI + release
 ```
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
+3. Run `npm test && npm run lint`
 4. Open a Pull Request
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](LICENSE). `vendor/pdfjs` is Apache-2.0 (see its LICENSE).
 
 ---
 
