@@ -1,0 +1,21 @@
+{
+  "name": "incobills",
+  "private": true,
+  "description": "IncoBills Thunderbird add-on — development tooling (the add-on itself has no build step).",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test --test-timeout=60000 \"tests/**/*.test.js\"",
+    "lint": "web-ext lint --source-dir . --warnings-as-errors false",
+    "build": "web-ext build --source-dir . --artifacts-dir dist --overwrite-dest --filename \"incobills-{version}.xpi\"",
+    "vendor:pdfjs": "node scripts/vendor-pdfjs.js",
+    "check": "npm test && npm run lint"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "pdfjs-dist": "6.4.299",
+    "web-ext": "10.8.0"
+  }
+}
