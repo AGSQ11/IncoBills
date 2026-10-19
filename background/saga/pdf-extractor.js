@@ -32,6 +32,7 @@ const PDFExtractor = {
         schemaName: "invoice_data",
         maxTokens: LLM_LIMITS.extractMaxTokens,
         timeoutMs: LLM_LIMITS.extractTimeoutMs,
+        numCtx: SAGA_LIMITS.ollamaExtractContext,
       });
     } else {
       raw = await LLM.completeJson({

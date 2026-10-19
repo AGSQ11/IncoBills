@@ -86,7 +86,7 @@ async function loadSaga() {
 
     const list = $("sagaRecentList");
     clear(list);
-    const open = queue.filter((q) => q.status === "extracted" || q.status === "reviewed" || q.status === "failed").slice(0, 5);
+    const open = queue.filter((q) => ["pending", "extracted", "reviewed", "failed"].includes(q.status)).slice(0, 5);
     if (open.length === 0) {
       list.appendChild(el("div", "empty-state", t("queueEmpty")));
       return;
@@ -107,7 +107,9 @@ function createSagaItem(item) {
   const direction = t(item.direction === "intrari" ? "dirIntrari" : item.direction === "iesiri" ? "dirIesiri" : "dirUnknown");
   const meta = item.data
     ? [d.facturaData, direction, Number.isFinite(total) ? `${total.toFixed(2)} ${d.moneda || "RON"}` : ""].filter(Boolean).join(" | ")
-    : tMsg(item.error);
+    : item.status === "pending"
+      ? t("status_pending")
+      : tMsg(item.error);
   info.appendChild(el("div", "recent-subject", meta));
   row.appendChild(info);
   return row;

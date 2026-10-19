@@ -30,7 +30,7 @@ const InvoiceValidator = {
    * @param {object} d  normalized invoice
    * @param {object} ctx { direction, intraGroup }
    */
-  validate(d, { direction, intraGroup = false } = {}) {
+  validate(d, { direction, intraGroup = false, companyCif = "" } = {}) {
     const errors = [];
     const warnings = [];
     const err = (key, ...args) => errors.push({ key, args: args.map(String) });
@@ -39,6 +39,13 @@ const InvoiceValidator = {
 
     if (!direction || direction === SAGA_INVOICE_DIRECTION.UNKNOWN) err("valDirectionUnknown");
     if (intraGroup) warn("valIntraGroup");
+    // The chosen company must be the supplier (iesiri) or the client (intrari) on the invoice.
+    if (companyCif && direction === SAGA_INVOICE_DIRECTION.IESIRI && !Fiscal.sameCompany(companyCif, d.furnizorCif)) {
+      err("valDirectionMismatch", companyCif, label("furnizorCif"));
+    }
+    if (companyCif && direction === SAGA_INVOICE_DIRECTION.INTRARI && !Fiscal.sameCompany(companyCif, d.clientCif)) {
+      err("valDirectionMismatch", companyCif, label("clientCif"));
+    }
 
     if (!d.facturaNumar) err("valFieldRequired", label("facturaNumar"));
     if (!Text.isIsoDate(d.facturaData)) err("valDateInvalid", label("facturaData"), d.facturaData || "-");

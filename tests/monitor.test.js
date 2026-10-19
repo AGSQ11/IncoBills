@@ -188,3 +188,62 @@ test("message router: unknown type and settings filter", async () => {
   assert.equal(settings.confidenceThreshold, 0.7);
   assert.equal(settings.classificationHistory, undefined);
 });
+
+// ---- Regression tests for the independent review ----
+
+test("upgrade: 1.1 history ids (session ids) do not block new messages", async () => {
+  const env = createEnv();
+  await env.browser.storage.local.set({ schemaVersion: 1, classificationHistory: [{ id: 1, messageId: 3, action: "skipped" }] });
+  delete env.store.schemaVersion;
+  await env.get("Storage").migrate();
+  assert.equal(env.store.classificationHistory[0].messageId, null);
+  const msg = env.addMessage({ id: 3, ...INVOICE }, { body: INVOICE_BODY });
+  await env.get("EmailMonitor").handleNewMail(msg.folder, { id: null, messages: [msg] });
+  assert.equal(env.moved.length, 1);
+});
+
+test("folders: an Invoices folder inside Trash is never used", async () => {
+  const env = createEnv();
+  env.mail.folders.push(
+    { id: "account1://Trash", accountId: "account1", name: "Trash", path: "/Trash", specialUse: ["trash"], parentFolderId: "account1://" },
+    { id: "account1://Trash/Invoices", accountId: "account1", name: "Invoices", path: "/Trash/Invoices", parentFolderId: "account1://Trash" }
+  );
+  const id = await env.get("FolderManager").ensureParentFolder("account1", "Invoices");
+  assert.equal(id, "account1://Invoices");
+});
+
+test("folders: falls back to a folder inside the inbox when the root refuses", async () => {
+  const env = createEnv();
+  const create = env.browser.folders.create.bind(env.browser.folders);
+  env.browser.folders.create = async (parentId, name) => {
+    if (parentId === "account1://") throw new Error("server refused");
+    return create(parentId, name);
+  };
+  const id = await env.get("FolderManager").ensureParentFolder("account1", "Invoices");
+  assert.equal(id, "account1://INBOX/Invoices");
+});
+
+test("backend banner clears after a restart once a call succeeds, and on backend change", async () => {
+  const env = createEnv();
+  await env.browser.storage.local.set({ aiBackend: "claude", claudeApiKey: "k", hybridMode: false, backendStatus: { ok: false, backend: "claude", error: "old" } });
+  env.respond({ content: [{ type: "tool_use", name: "classify_email", input: { isInvoice: false, confidence: 0.1, reason: "x" } }] });
+  await env.get("Classifier").classify({ subject: "Invoice?", from: "a@b.c", bodySnippet: "", attachmentNames: [] });
+  assert.equal(env.store.backendStatus.ok, true);
+
+  await env.browser.storage.local.set({ backendStatus: { ok: false, backend: "claude", error: "old" } });
+  env.get("Classifier")._storedOk = false;
+  await env.sendMessage({ type: "saveSettings", data: { aiBackend: "keywords" } });
+  assert.equal(env.store.backendStatus.ok, true);
+});
+
+test("'Mark as invoice' on an already detected message counts it once", async () => {
+  const env = createEnv();
+  const msg = env.addMessage({ id: 1, ...INVOICE }, { body: INVOICE_BODY });
+  await env.get("EmailMonitor").handleNewMail(msg.folder, { id: null, messages: [msg] });
+  await env.get("Menus").apply({ id: null, messages: [structuredClone(env.mail.messages[0])] }, "invoice");
+  const stats = await env.get("History").getStats();
+  assert.equal(stats.total, 1);
+  assert.equal(env.store.classificationHistory.length, 1);
+  assert.equal(env.store.classificationHistory[0].userOverride, "invoice");
+  assert.equal(env.moved.length, 1, "no second move");
+});

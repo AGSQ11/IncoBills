@@ -90,8 +90,9 @@ const EFactura = {
   },
 
   /** Parse an XML or ZIP attachment. Returns [{ invoice }] (empty if none). */
-  async parseAttachment({ name, bytes }) {
-    const kind = this.kind({ name });
+  async parseAttachment(attachment) {
+    const { bytes } = attachment;
+    const kind = attachment.kind || this.kind(attachment);
     if (kind === "zip") {
       const entries = await Zip.read(bytes);
       const results = [];
@@ -190,7 +191,7 @@ const EFactura = {
         descriere: name && description && description !== name ? `${name} - ${description}` : name || description || "",
         um: SAGA_UNIT_CODES[unitCode] || unitCode || "buc",
         cantitate: Number.isFinite(qty) ? sign * qty : sign,
-        pret: priceAmount === null ? null : Fiscal.round2(priceAmount / baseQty),
+        pret: priceAmount === null ? null : Math.round((priceAmount / baseQty) * 1e6) / 1e6,
         valoare: sign * value,
         procTVA: rate,
         tva: rate === null ? null : Fiscal.round2(sign * value * (rate / 100)),

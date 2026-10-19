@@ -43,16 +43,15 @@ const Menus = {
 
   async markInvoice(message, settings) {
     const previous = await History.findByHeaderId(message.headerMessageId);
-    if (previous) await History.updateOverride(previous.id, "invoice");
-
     const folder = message.folder || null;
-    let action = "flagged";
+    const alreadyInFolder = FolderManager.isInvoicesFolder(folder, settings.folderName);
+    let action = alreadyInFolder ? "already" : "flagged";
     let targetFolderId = null;
     let error = null;
     const attachments = await EmailMonitor.listAttachments(message.id);
     const sagaAttachments = await SAGAExport.collectAttachments(message, attachments).catch(() => []);
 
-    if (settings.autoMove && !settings.notifyOnly && !FolderManager.isInvoicesFolder(folder, settings.folderName)) {
+    if (settings.autoMove && !settings.notifyOnly && !alreadyInFolder) {
       try {
         const moved = await FolderManager.moveToInvoices(message, folder && folder.accountId, settings);
         action = moved.action;
@@ -64,20 +63,34 @@ const Menus = {
     }
     if (sagaAttachments.length > 0) SAGAExport.enqueue(EmailMonitor.messageMeta(message), sagaAttachments);
 
-    await History.log({
-      messageId: message.id,
-      headerMessageId: message.headerMessageId || null,
-      from: message.author || "",
-      subject: message.subject || "",
-      accountId: (folder && folder.accountId) || null,
-      sourceFolderId: (folder && folder.id) || null,
-      targetFolderId,
-      classification: { isInvoice: true, confidence: 1, reason: "marked by user", source: "user" },
-      backend: "user",
-      action,
-      error,
-      userOverride: "invoice",
-    });
+    const classification = { isInvoice: true, confidence: 1, reason: "marked by user", source: "user" };
+    if (previous) {
+      // Update the existing entry, so one message is counted once.
+      const keepAction = DETECTED_ACTIONS.includes(previous.action) && (action === "already" || action === "flagged");
+      await History.updateEntry(previous.id, {
+        userOverride: "invoice",
+        classification,
+        action: keepAction ? previous.action : action,
+        targetFolderId: targetFolderId || previous.targetFolderId || null,
+        sourceFolderId: previous.sourceFolderId || (folder && folder.id) || null,
+        error,
+      });
+    } else {
+      await History.log({
+        messageId: message.id,
+        headerMessageId: message.headerMessageId || null,
+        from: message.author || "",
+        subject: message.subject || "",
+        accountId: (folder && folder.accountId) || null,
+        sourceFolderId: (folder && folder.id) || null,
+        targetFolderId,
+        classification,
+        backend: "user",
+        action,
+        error,
+        userOverride: "invoice",
+      });
+    }
     await History.markProcessed(message);
   },
 

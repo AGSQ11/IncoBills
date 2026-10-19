@@ -109,11 +109,12 @@ const FolderManager = {
 
     return this._once(key, async () => {
       const existing = await browser.folders.query({ accountId, name: folderName });
-      if (existing.length > 0) {
-        // Prefer the top-most folder with this name (e.g. "/Invoices" over "/Archive/Invoices").
-        const depth = (f) => (f.path || "").split("/").length;
-        existing.sort((a, b) => depth(a) - depth(b));
-        return (this._cache[key] = existing[0].id);
+      // Prefer the top-most folder with this name ("/Invoices" over "/Archive/Invoices").
+      // Never use one inside Trash or Junk (e.g. after the user deleted the folder).
+      const depth = (f) => (f.path || "").split("/").length;
+      existing.sort((a, b) => depth(a) - depth(b));
+      for (const candidate of existing) {
+        if (!(await this._insideTrashOrJunk(candidate))) return (this._cache[key] = candidate.id);
       }
 
       const account = await browser.accounts.get(accountId);
@@ -128,13 +129,14 @@ const FolderManager = {
       }
 
       try {
+        // Some IMAP servers allow new folders only inside the INBOX namespace (INBOX.Invoices).
         const inbox = await browser.folders.query({ accountId, specialUse: ["inbox"] });
-        if (inbox.length > 0 && inbox[0].parentFolderId) {
-          const created = await browser.folders.create(inbox[0].parentFolderId, folderName);
+        if (inbox.length > 0) {
+          const created = await browser.folders.create(inbox[0].id, folderName);
           return (this._cache[key] = created.id);
         }
       } catch (err) {
-        console.warn(`IncoBills: cannot create "${folderName}" next to the inbox of ${accountId}:`, err.message);
+        console.warn(`IncoBills: cannot create "${folderName}" inside the inbox of ${accountId}:`, err.message);
       }
 
       // Local Folders keeps mail only on this computer, so it is opt-in.
@@ -145,6 +147,26 @@ const FolderManager = {
 
       throw new Error(t("errCannotCreateFolder", [folderName]));
     });
+  },
+
+  TRASH_NAMES: ["trash", "junk", "spam", "deleted items", "deleted messages", "bin", "cos de gunoi", "gunoi"],
+
+  /** True if the folder or one of its parents is Trash/Junk. */
+  async _insideTrashOrJunk(folder) {
+    const isBad = (f) =>
+      [].concat(f.specialUse || [], f.type ? [f.type] : []).some((use) => use === "trash" || use === "junk") ||
+      this.TRASH_NAMES.includes(Text.normalize(f.name || ""));
+    if (isBad(folder)) return true;
+    try {
+      const parents = await browser.folders.getParentFolders(folder.id, false);
+      return parents.some(isBad);
+    } catch {
+      // Fallback on the path when getParentFolders is not available.
+      return String(folder.path || "")
+        .split("/")
+        .slice(0, -1)
+        .some((segment) => this.TRASH_NAMES.includes(Text.normalize(segment)));
+    }
   },
 
   async _findLocalFoldersFolder(folderName) {

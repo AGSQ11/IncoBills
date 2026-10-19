@@ -315,10 +315,10 @@
     "message": "Extrage automat datele facturilor din emailurile detectate"
   },
   "lblCloudConsent": {
-    "message": "Sunt de acord să trimit facturile PDF complete către AI-ul cloud ales (Claude/OpenAI)"
+    "message": "Sunt de acord să trimit facturile PDF complete către serviciul AI ales (Claude, OpenAI sau un Ollama la distanță)"
   },
   "hintCloudConsent": {
-    "message": "Facturile pot conține date personale (GDPR). Fără acest acord, facturile PDF sunt extrase doar cu Ollama local. e-Factura XML nu pleacă niciodată de pe calculator."
+    "message": "Facturile pot conține date personale (GDPR). Fără acest acord, facturile PDF sunt extrase doar cu Ollama pe acest calculator. e-Factura XML nu pleacă niciodată de pe calculator."
   },
   "lblAnafLookup": {
     "message": "Completează datele partenerului și statutul TVA din registrul public ANAF"
@@ -336,13 +336,13 @@
     "message": "Exportul SAGA este activ, dar motorul este „Doar cuvinte cheie”. Vor fi citite doar atașamentele e-Factura XML. Alege Claude, OpenAI sau Ollama pentru facturile PDF."
   },
   "warnSagaConsent": {
-    "message": "Facturile PDF nu vor fi extrase până nu ești de acord să le trimiți către AI-ul cloud (Setări export, mai jos)."
+    "message": "Facturile PDF nu vor fi extrase până nu ești de acord să le trimiți către serviciul AI (Setări export, mai jos)."
   },
   "sagaQueue": {
     "message": "Coada de facturi"
   },
   "hintQueue": {
-    "message": "Verifică fiecare factură înainte de export. Elementele cu erori nu pot fi exportate până nu le corectezi."
+    "message": "Facturile citite de AI dintr-un PDF trebuie verificate înainte de export. Facturile e-Factura fără erori sunt gata imediat."
   },
   "btnExportReady": {
     "message": "Exportă cele gata"
@@ -447,7 +447,7 @@
     "message": "Factura PDF nu a fost extrasă: alege Claude, OpenAI sau Ollama, apoi apasă Reîncearcă."
   },
   "errSagaNoConsent": {
-    "message": "Factura PDF nu a fost extrasă: acceptă trimiterea PDF-urilor către AI-ul cloud în setările SAGA, apoi apasă Reîncearcă."
+    "message": "Factura PDF nu a fost extrasă: acceptă trimiterea PDF-urilor către serviciul AI în setările SAGA, apoi apasă Reîncearcă."
   },
   "errPdfNoText": {
     "message": "PDF-ul nu are text (este o imagine scanată). Folosește Claude sau OpenAI pentru această factură."
@@ -886,5 +886,14 @@
   },
   "timeDays": {
     "message": "acum $1 z"
+  },
+  "status_pending": {
+    "message": "Se procesează…"
+  },
+  "valDirectionMismatch": {
+    "message": "Firma $1 nu este $2 pe această factură. Verifică direcția, firma și CIF-urile."
+  },
+  "errDownloadInterrupted": {
+    "message": "Descărcarea a fost întreruptă. Exportă din nou factura."
   }
 }

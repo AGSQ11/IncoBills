@@ -143,6 +143,12 @@ const Storage = {
       }));
     }
 
+    // Thunderbird message ids are only valid for one session: old history entries
+    // must not be used to skip new messages. Keep them for display only.
+    if (Array.isArray(stored[DATA_KEYS.HISTORY])) {
+      changes[DATA_KEYS.HISTORY] = stored[DATA_KEYS.HISTORY].map((e) => (e && !e.headerMessageId ? { ...e, messageId: null, legacy: true } : e));
+    }
+
     changes[DATA_KEYS.SCHEMA] = SCHEMA_VERSION;
     await this.set(changes);
     this._settings = null;

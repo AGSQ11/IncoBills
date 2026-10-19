@@ -340,3 +340,128 @@ test("vendored pdf.js files are unmodified copies of pdfjs-dist", () => {
     assert.ok(vendored.equals(upstream), `${file} differs from pdfjs-dist`);
   }
 });
+
+// ---- Regression tests for the independent review ----
+
+test("AI-read PDF invoice is not exportable until a person reviews it", async () => {
+  const env = await setup();
+  env.respond({ content: [{ type: "tool_use", name: "invoice_data", input: foreignInvoice() }] });
+  await env.get("SAGAExport").processEmail(pdfMessage(env));
+  const SAGA = env.get("SAGAExport");
+  const item = env.store.sagaQueue[0];
+  assert.equal(item.needsReview, false);
+  assert.equal(SAGA.isExportable(item), false);
+  assert.equal((await SAGA.exportAll()).length, 0);
+  await SAGA.updateItem(item.id, {}, { markReviewed: true });
+  assert.equal(SAGA.isExportable(env.store.sagaQueue[0]), true);
+});
+
+test("e-Factura invoice without errors is exportable at once", async () => {
+  const env = await setup({ backend: "keywords" });
+  await env.get("SAGAExport").ingest(env.get("EFactura").parseXml(UBL), { headerMessageId: "m@x" });
+  assert.equal(env.get("SAGAExport").isExportable(env.store.sagaQueue[0]), true);
+});
+
+test("review: wrong direction for the company is an error (no own company on both sides)", async () => {
+  const env = await setup();
+  env.respond({ content: [{ type: "tool_use", name: "invoice_data", input: foreignInvoice() }] });
+  await env.get("SAGAExport").processEmail(pdfMessage(env));
+  const item = env.store.sagaQueue[0];
+  const result = await env.get("SAGAExport").updateItem(item.id, { data: item.data, direction: "iesiri", companyId: item.companyId }, { markReviewed: true });
+  assert.equal(result.reviewed, false);
+  assert.ok(result.validation.errors.some((e) => e.key === "valDirectionMismatch"));
+});
+
+test("review: fixing the client CIF resolves an unknown direction", async () => {
+  const env = await setup();
+  env.respond({ content: [{ type: "tool_use", name: "invoice_data", input: foreignInvoice({ clientCif: "RO14399840" }) }] });
+  await env.get("SAGAExport").processEmail(pdfMessage(env));
+  const item = env.store.sagaQueue[0];
+  assert.equal(item.direction, "unknown");
+  const result = await env.get("SAGAExport").updateItem(item.id, { data: { ...item.data, clientCif: "RO 18547290" }, direction: undefined, companyId: null }, { markReviewed: true });
+  assert.equal(result.item.direction, "intrari");
+  assert.equal(result.reviewed, true, JSON.stringify(result.validation.errors));
+});
+
+test("double export click downloads the invoice once", async () => {
+  const env = await setup({ backend: "keywords" });
+  await env.get("SAGAExport").ingest(env.get("EFactura").parseXml(UBL), { headerMessageId: "m@x" });
+  const SAGA = env.get("SAGAExport");
+  const [a, b] = await Promise.all([SAGA.exportAll(), SAGA.exportItems([env.store.sagaQueue[0].id])]);
+  assert.equal(env.downloads.length, 1);
+  assert.equal([...a, ...b].filter((r) => r.success).length, 1);
+});
+
+test("interrupted download puts the invoice back in the queue", async () => {
+  const env = await setup({ backend: "keywords" });
+  await env.get("SAGAExport").ingest(env.get("EFactura").parseXml(UBL), { headerMessageId: "m@x" });
+  const [result] = await env.get("SAGAExport").exportAll();
+  assert.equal(env.store.sagaQueue[0].status, "exported");
+  for (const listener of env.listeners.downloadsChanged) listener({ id: result.downloadId, state: { current: "interrupted" } });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(env.store.sagaQueue[0].status, "extracted");
+  assert.equal(env.store.sagaQueue[0].error, "The download was interrupted. Export the invoice again.");
+});
+
+test("pending job survives a restart: marker saved, resumed by Message-ID", async () => {
+  const env = await setup();
+  const msg = pdfMessage(env);
+  // Simulate a marker left by a job that was running when Thunderbird closed.
+  await env.get("SAGAExport").addPending(env.get("EmailMonitor").messageMeta(msg));
+  assert.equal(env.store.sagaQueue[0].status, "pending");
+  env.respond({ content: [{ type: "tool_use", name: "invoice_data", input: foreignInvoice() }] });
+  await env.get("SAGAExport").resumePending();
+  await env.get("SAGAExport")._jobs;
+  const statuses = env.store.sagaQueue.map((q) => q.status);
+  assert.equal(JSON.stringify(statuses), '["extracted"]');
+});
+
+test("enqueue keeps a pending marker until the job ends", async () => {
+  const env = await setup();
+  const msg = pdfMessage(env);
+  let release;
+  env.respond(() => new Promise((resolve) => (release = () => resolve(jsonResponse({ content: [{ type: "tool_use", name: "invoice_data", input: foreignInvoice() }] })))));
+  const SAGA = env.get("SAGAExport");
+  const attachments = await SAGA.collectAttachments(msg);
+  const job = SAGA.enqueue(env.get("EmailMonitor").messageMeta(msg), attachments);
+  while (!release) await new Promise((r) => setTimeout(r, 5));
+  assert.ok(env.store.sagaQueue.some((q) => q.status === "pending"));
+  release();
+  await job;
+  await SAGA._jobs;
+  assert.equal(JSON.stringify(env.store.sagaQueue.map((q) => q.status)), '["extracted"]');
+});
+
+test("remote Ollama needs consent too; local Ollama does not", async () => {
+  const env = createEnv();
+  const LLM = env.get("LLM");
+  assert.equal(LLM.isRemote({ backend: "ollama", baseUrl: "http://127.0.0.1:11434" }), false);
+  assert.equal(LLM.isRemote({ backend: "ollama", baseUrl: "http://[::1]:11434" }), false);
+  assert.equal(LLM.isRemote({ backend: "ollama", baseUrl: "http://192.168.1.20:11434" }), true);
+  assert.equal(LLM.isRemote({ backend: "claude", baseUrl: "https://api.anthropic.com" }), true);
+});
+
+test("Ollama extraction sets a large context window", async () => {
+  const env = await setup({ backend: "ollama" });
+  const lib = await import(path.join(ROOT, "node_modules/pdfjs-dist/legacy/build/pdf.mjs"));
+  env.get("PDFExtractor")._pdfjs = lib;
+  env.respond({ message: { content: JSON.stringify(foreignInvoice()) } });
+  await env.get("SAGAExport").processEmail(pdfMessage(env));
+  assert.equal(env.fetchCalls[0].body.options.num_ctx, 16384);
+});
+
+test("e-Factura unit price keeps 4 decimals (kWh prices)", async () => {
+  const env = createEnv();
+  const xml = UBL.replace("<cbc:PriceAmount currencyID=\"RON\">100.00</cbc:PriceAmount>", "<cbc:PriceAmount currencyID=\"RON\">0.7859</cbc:PriceAmount>");
+  const inv = env.get("EFactura").parseXml(xml);
+  assert.equal(inv.linii[0].pret, 0.7859);
+  const company = { name: "Firma Mea SRL", cif: "RO18547290" };
+  assert.match(env.get("SAGAXMLGenerator").generate(inv, company, "intrari").xml, /<Pret>0\.7859<\/Pret>/);
+});
+
+test("ZIP attachment without .zip name is read by content type", async () => {
+  const env = createEnv();
+  const zip = makeZip({ "4123456789.xml": UBL });
+  const results = await env.get("EFactura").parseAttachment({ name: "download", contentType: "application/zip", kind: "zip", bytes: zip });
+  assert.equal(results.length, 1);
+});

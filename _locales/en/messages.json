@@ -315,10 +315,10 @@
     "message": "Extract invoice data automatically from detected emails"
   },
   "lblCloudConsent": {
-    "message": "I agree to send full PDF invoices to the selected cloud AI (Claude/OpenAI)"
+    "message": "I agree to send full PDF invoices to the selected AI service (Claude, OpenAI or a remote Ollama)"
   },
   "hintCloudConsent": {
-    "message": "Invoices can contain personal data (GDPR). Without this consent, PDF invoices are extracted only with local Ollama. e-Factura XML never leaves your computer."
+    "message": "Invoices can contain personal data (GDPR). Without this consent, PDF invoices are extracted only with Ollama on this computer. e-Factura XML never leaves your computer."
   },
   "lblAnafLookup": {
     "message": "Complete partner data and VAT status from the public ANAF registry"
@@ -336,13 +336,13 @@
     "message": "SAGA export is on, but the backend is \"Keywords only\". Only e-Factura XML attachments will be read. Select Claude, OpenAI or Ollama to read PDF invoices."
   },
   "warnSagaConsent": {
-    "message": "PDF invoices will not be extracted until you agree to send them to the cloud AI (Export settings below)."
+    "message": "PDF invoices will not be extracted until you agree to send them to the AI service (Export settings below)."
   },
   "sagaQueue": {
     "message": "Invoice queue"
   },
   "hintQueue": {
-    "message": "Review each invoice before export. Items with errors cannot be exported until you fix them."
+    "message": "Invoices read from a PDF by the AI must be reviewed before export. e-Factura invoices without errors are ready at once."
   },
   "btnExportReady": {
     "message": "Export ready"
@@ -447,7 +447,7 @@
     "message": "PDF invoice not extracted: select Claude, OpenAI or Ollama, then click Retry."
   },
   "errSagaNoConsent": {
-    "message": "PDF invoice not extracted: agree to send PDFs to the cloud AI in SAGA settings, then click Retry."
+    "message": "PDF invoice not extracted: agree to send PDFs to the AI service in SAGA settings, then click Retry."
   },
   "errPdfNoText": {
     "message": "The PDF has no text layer (scanned image). Use Claude or OpenAI for this invoice."
@@ -886,5 +886,14 @@
   },
   "timeDays": {
     "message": "$1d ago"
+  },
+  "status_pending": {
+    "message": "Processing…"
+  },
+  "valDirectionMismatch": {
+    "message": "Company $1 is not the $2 on this invoice. Check the direction, the company and the CIFs."
+  },
+  "errDownloadInterrupted": {
+    "message": "The download was interrupted. Export the invoice again."
   }
 }

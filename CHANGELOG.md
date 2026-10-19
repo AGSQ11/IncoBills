@@ -29,11 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stats counted only moved emails (copy and notify-only modes showed 0); unchecking every account meant "monitor all".
 - The batch notification always said "moved"; two invoices produced one single and one batch notification.
 - The move fallback (copy + delete) always failed at delete (no permission) and left duplicates. Removed: `messages.move()` handles cross-account moves itself.
+- An "Invoices" folder inside Trash/Junk (e.g. after the user deleted it) was reused, so new invoices went to Trash. Such folders are now ignored. The "inside Inbox" fallback works again (it used a property that Thunderbird 128 does not have).
 
 ### Added
 - **e-Factura (UBL 2.1 / CIUS-RO)**: XML attachments and ANAF SPV ZIP files are read exactly, without AI. Document-level discounts, credit notes and unit codes are supported.
 - **ANAF lookup** (public registry, only the CIF is sent): fills partner data, sets the correct `RO` prefix from VAT status, sets "TVA la încasare" for suppliers in RTVAI, and warns about inactive partners.
-- **Review editor** for queued invoices: edit header, parties and lines, see validation results, then mark as reviewed.
+- **Review editor** for queued invoices: edit header, parties and lines, see validation results, then mark as reviewed. Data read by the AI from a PDF must be reviewed before export; e-Factura data without errors is ready at once. The chosen direction must match the company CIF on the invoice.
+- SAGA jobs are saved as "pending" first and resume after a Thunderbird restart. Exports run one at a time (no duplicate XML on a double click); an interrupted download puts the invoice back in the queue.
 - **Validation** before export: line sums, VAT sums, totals, CIF check digit, IBAN mod-97, dates, VAT rates.
 - Local PDF text extraction with the bundled, unmodified **pdf.js** (Ollama backend). Scanned PDFs without text get a clear message.
 - Separate **extraction model** setting per backend (default: a Sonnet-class model for Claude).
@@ -46,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tests (`npm test`), lint, CI and an automatic release workflow that builds the `.xpi`.
 
 ### Changed
-- **Privacy**: SAGA sends full PDFs to Claude/OpenAI only after explicit consent. README updated.
+- **Privacy**: SAGA sends full PDFs to Claude/OpenAI (or a remote Ollama) only after explicit consent. README updated.
+- History entries from 1.0/1.1 are kept for display only: their Thunderbird message ids are valid for one session and could hide new mail. The first scan after the upgrade checks older emails again.
 - **Permissions**: `<all_urls>` replaced by the fixed API hosts; a custom API URL asks for its host permission when you save. New `menus` permission.
 - Local Folders fallback is now opt-in (it moves mail off the server).
 - Default models: `claude-haiku-5-5` / `claude-sonnet-5-5`, `gpt-6-luna` (the old defaults are retired or deprecated). Saved old defaults are migrated.

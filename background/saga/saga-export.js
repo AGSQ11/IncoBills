@@ -13,6 +13,8 @@
 const SAGAExport = {
   _jobs: Promise.resolve(),
   _pending: 0,
+  _queuedBytes: 0,
+  _exportChain: Promise.resolve(),
 
   // ---------------------------------------------------------------
   //  Settings
@@ -87,17 +89,77 @@ const SAGAExport = {
     return picked;
   },
 
-  /** Process attachments in the background, one email at a time (rate limits). */
-  enqueue(meta, attachments) {
+  /**
+   * Process attachments in the background, one email at a time (rate limits).
+   * A "pending" queue item is saved first, so an interrupted job (Thunderbird
+   * closed, add-on reloaded) resumes at the next start. Attachment bytes stay in
+   * memory only up to SAGA_LIMITS.maxQueuedBytes; above that the job reads the
+   * email again when it runs.
+   */
+  async enqueue(meta, attachments) {
+    const marker = await this.addPending(meta).catch(() => null);
+    const size = (attachments || []).reduce((sum, a) => sum + (a.bytes ? a.bytes.byteLength : 0), 0);
+    let payload = attachments;
+    if (!payload || this._queuedBytes + size > SAGA_LIMITS.maxQueuedBytes) payload = null;
+    else this._queuedBytes += size;
+
     this._pending++;
     this._jobs = this._jobs
       .catch(() => {})
-      .then(() => this.processAttachments(meta, attachments))
-      .catch((err) => console.error("[SAGA] processing failed:", err))
-      .finally(() => {
+      .then(async () => {
+        const list = payload || (await this.reloadAttachments(meta.headerMessageId));
+        return this.processAttachments(meta, list);
+      })
+      .catch((err) => {
+        console.error("[SAGA] processing failed:", err);
+        return this.addFailure(meta, Text.shortError(err));
+      })
+      .finally(async () => {
         this._pending--;
+        if (payload) this._queuedBytes -= size;
+        if (marker) await this.removeFromQueue(marker.id).catch(() => {});
       });
     return this._jobs;
+  },
+
+  /** Find the email again (by Message-ID) and read its invoice attachments. */
+  async reloadAttachments(headerMessageId) {
+    if (!headerMessageId) throw new Error(t("errRetryNoMessage"));
+    const list = await browser.messages.query({ headerMessageId });
+    const message = list && list.messages && list.messages[0];
+    if (!message) throw new Error(t("errRetryNoMessage"));
+    return this.collectAttachments(message, undefined, { force: true });
+  },
+
+  async addPending(meta) {
+    if (!meta.headerMessageId) return null;
+    const item = {
+      id: crypto.randomUUID(),
+      status: SAGA_QUEUE_STATUS.PENDING,
+      direction: SAGA_INVOICE_DIRECTION.UNKNOWN,
+      data: null,
+      messageId: meta.messageId ?? null,
+      headerMessageId: meta.headerMessageId,
+      subject: meta.subject || "",
+      from: meta.from || "",
+      date: meta.date || null,
+      extractedAt: new Date().toISOString(),
+    };
+    await Storage.update(SAGA_STORAGE_KEYS.QUEUE, (queue) => [item, ...queue], []);
+    return item;
+  },
+
+  /** At startup: jobs that were pending when Thunderbird closed run again. */
+  async resumePending() {
+    const queue = await this.getQueue();
+    const pending = queue.filter((q) => q.status === SAGA_QUEUE_STATUS.PENDING);
+    const jobs = [];
+    for (const item of pending) {
+      await this.removeFromQueue(item.id);
+      jobs.push(this.enqueue({ messageId: item.messageId, headerMessageId: item.headerMessageId, subject: item.subject, from: item.from, date: item.date }, null));
+    }
+    await Promise.all(jobs);
+    return pending.length;
   },
 
   /** Kept for callers of the 1.1 API. */
@@ -136,7 +198,7 @@ const SAGAExport = {
       await this.addFailure(meta, { key: "errSagaNeedsAi" });
       return added;
     }
-    if (LLM.isCloud(provider.backend) && !sagaSettings.cloudConsent) {
+    if (LLM.isRemote(provider) && !sagaSettings.cloudConsent) {
       await this.addFailure(meta, { key: "errSagaNoConsent" });
       return added;
     }
@@ -222,7 +284,7 @@ const SAGAExport = {
     }
 
     const anaf = sagaSettings.anafLookup ? await this.enrichFromAnaf(data, direction) : null;
-    const validation = InvoiceValidator.validate(data, { direction, intraGroup });
+    const validation = InvoiceValidator.validate(data, { direction, intraGroup, companyCif: company ? company.cif : "" });
     if (anaf && anaf.inactive) validation.warnings.push({ key: "valPartnerInactive", args: [data[`${anaf.party}Cif`]] });
     const dedupeKey = this.dedupeKey(data, meta);
 
@@ -310,9 +372,14 @@ const SAGAExport = {
     return Array.isArray(queue) ? queue : [];
   },
 
+  /**
+   * e-Factura data is exact: exportable when all checks pass.
+   * Data read by an AI from a PDF must be reviewed by a person first.
+   */
   isExportable(item) {
+    const reviewedOrExact = item.status === SAGA_QUEUE_STATUS.REVIEWED || (item.status === SAGA_QUEUE_STATUS.EXTRACTED && item.source === "efactura");
     return (
-      (item.status === SAGA_QUEUE_STATUS.EXTRACTED || item.status === SAGA_QUEUE_STATUS.REVIEWED) &&
+      reviewedOrExact &&
       !item.needsReview &&
       item.direction !== SAGA_INVOICE_DIRECTION.UNKNOWN &&
       Boolean(item.companyId) &&
@@ -328,7 +395,7 @@ const SAGAExport = {
       exportable: open.filter((q) => this.isExportable(q)).length,
       needsReview: open.filter((q) => !this.isExportable(q)).length,
       failed: queue.filter((q) => q.status === SAGA_QUEUE_STATUS.FAILED).length,
-      processing: this._pending,
+      processing: queue.filter((q) => q.status === SAGA_QUEUE_STATUS.PENDING).length,
     };
   },
 
@@ -353,16 +420,21 @@ const SAGAExport = {
     if (!current.data && !data) throw new Error(t("errQueueItemNoData"));
 
     const newData = data ? this.sanitizeEdited(data) : current.data;
-    let newDirection = direction || current.direction;
-    let company = companyId ? await CompanyRegistry.getById(companyId) : null;
-    let intraGroup = false;
-    if (!company) {
-      const resolved = await CompanyRegistry.resolve(newData.furnizorCif, newData.clientCif);
-      company = resolved.company;
-      intraGroup = resolved.intraGroup;
-      if (!direction) newDirection = resolved.direction;
+    const resolved = await CompanyRegistry.resolve(newData.furnizorCif, newData.clientCif);
+    const company = (companyId ? await CompanyRegistry.getById(companyId) : null) || resolved.company;
+    const chosen = direction === SAGA_INVOICE_DIRECTION.INTRARI || direction === SAGA_INVOICE_DIRECTION.IESIRI ? direction : null;
+    // No direction chosen: derive it from the company and the CIFs on the invoice.
+    let newDirection = chosen;
+    if (!newDirection && company) {
+      if (Fiscal.sameCompany(company.cif, newData.furnizorCif)) newDirection = SAGA_INVOICE_DIRECTION.IESIRI;
+      else if (Fiscal.sameCompany(company.cif, newData.clientCif)) newDirection = SAGA_INVOICE_DIRECTION.INTRARI;
     }
-    const validation = InvoiceValidator.validate(newData, { direction: newDirection, intraGroup });
+    if (!newDirection) newDirection = resolved.direction;
+    const validation = InvoiceValidator.validate(newData, {
+      direction: newDirection,
+      intraGroup: resolved.intraGroup,
+      companyCif: company ? company.cif : "",
+    });
     if (!company) validation.errors.push({ key: "valCompanyMissing", args: [] });
     const reviewed = markReviewed && validation.errors.length === 0;
 
@@ -436,35 +508,43 @@ const SAGAExport = {
   //  Export
   // ---------------------------------------------------------------
 
-  _revokeLater(url, downloadId) {
+  /** Revoke the blob URL when the download ends; call onInterrupted if it fails. */
+  _watchDownload(url, downloadId, onInterrupted) {
     let done = false;
-    const revoke = () => {
+    const finish = (state) => {
       if (done) return;
       done = true;
       URL.revokeObjectURL(url);
-      if (browser.downloads.onChanged && listener) browser.downloads.onChanged.removeListener(listener);
+      if (browser.downloads.onChanged) browser.downloads.onChanged.removeListener(listener);
+      if (state === "interrupted" && onInterrupted) onInterrupted().catch(() => {});
     };
     const listener = (delta) => {
-      if (delta.id === downloadId && delta.state && ["complete", "interrupted"].includes(delta.state.current)) revoke();
+      if (delta.id === downloadId && delta.state && ["complete", "interrupted"].includes(delta.state.current)) finish(delta.state.current);
     };
     if (browser.downloads.onChanged) browser.downloads.onChanged.addListener(listener);
-    const timer = setTimeout(revoke, 120000);
+    const timer = setTimeout(() => finish("timeout"), 120000);
     if (timer && timer.unref) timer.unref(); // Node (tests) only
   },
 
-  async exportItems(itemIds) {
+  /** Exports run one at a time, so a double click cannot export an invoice twice. */
+  exportItems(itemIds) {
+    const run = this._exportChain.catch(() => {}).then(() => this._exportItems(itemIds));
+    this._exportChain = run;
+    return run;
+  },
+
+  async _exportItems(itemIds) {
     const ids = Array.isArray(itemIds) ? itemIds : [];
-    const queue = await this.getQueue();
     const settings = await this.getSettings();
     const results = [];
     for (const id of ids) {
-      const item = queue.find((q) => q.id === id);
+      const item = (await this.getQueue()).find((q) => q.id === id); // fresh read for each item
       if (!item) {
         results.push({ id, success: false, error: t("errQueueItemNotFound") });
         continue;
       }
       if (!this.isExportable(item)) {
-        results.push({ id, success: false, error: t("errNotExportable") });
+        results.push({ id, success: false, error: item.status === SAGA_QUEUE_STATUS.EXPORTED ? t("errQueueItemExported") : t("errNotExportable") });
         continue;
       }
       try {
@@ -474,12 +554,20 @@ const SAGAExport = {
         const url = URL.createObjectURL(new Blob([xml], { type: "application/xml" }));
         const path = `${this.sanitizeSubdirectory(settings.exportSubdirectory)}/${filename}`;
         const downloadId = await browser.downloads.download({ url, filename: path, saveAs: false, conflictAction: "uniquify" });
-        this._revokeLater(url, downloadId);
+        const previousStatus = item.status;
         const exportedAt = new Date().toISOString();
         await Storage.update(
           SAGA_STORAGE_KEYS.QUEUE,
-          (list) => list.map((q) => (q.id === id ? { ...q, status: SAGA_QUEUE_STATUS.EXPORTED, exportedAt, filename } : q)),
+          (list) => list.map((q) => (q.id === id ? { ...q, status: SAGA_QUEUE_STATUS.EXPORTED, exportedAt, filename, downloadId, error: null } : q)),
           []
+        );
+        // A failed download puts the invoice back, so it can be exported again.
+        this._watchDownload(url, downloadId, () =>
+          Storage.update(
+            SAGA_STORAGE_KEYS.QUEUE,
+            (list) => list.map((q) => (q.id === id && q.downloadId === downloadId ? { ...q, status: previousStatus, exportedAt: null, filename: null, error: t("errDownloadInterrupted") } : q)),
+            []
+          )
         );
         results.push({ id, success: true, downloadId, filename: path });
       } catch (err) {

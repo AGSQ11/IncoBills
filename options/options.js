@@ -251,12 +251,24 @@ async function loadBackendStatus() {
   }
 }
 
+/** Same rule as LLM.isRemote: Claude, OpenAI, or an Ollama that is not on localhost. */
+function isRemoteBackend(settings) {
+  if (!settings) return false;
+  if (settings.aiBackend === "claude" || settings.aiBackend === "openai") return true;
+  if (settings.aiBackend !== "ollama") return false;
+  try {
+    return !["localhost", "127.0.0.1", "[::1]", "::1"].includes(new URL(settings.ollamaUrl || DEFAULTS.ollamaUrl).hostname);
+  } catch {
+    return true;
+  }
+}
+
 function updateSagaWarnings() {
   const box = $("sagaBackendWarning");
   const backend = currentSettings && currentSettings.aiBackend;
   let text = "";
   if (companies.length > 0 && backend === "keywords") text = t("warnSagaNeedsAi");
-  else if (companies.length > 0 && (backend === "claude" || backend === "openai") && !(currentSagaSettings && currentSagaSettings.cloudConsent)) text = t("warnSagaConsent");
+  else if (companies.length > 0 && isRemoteBackend(currentSettings) && !(currentSagaSettings && currentSagaSettings.cloudConsent)) text = t("warnSagaConsent");
   box.textContent = text;
   box.hidden = !text;
 }
@@ -581,12 +593,17 @@ async function deleteSagaCompany(id) {
 //  SAGA — queue
 // ============================================================
 
+/** Same rule as SAGAExport.isExportable: AI-read data needs a review; e-Factura data does not. */
 function isExportable(item) {
-  return (item.status === "extracted" || item.status === "reviewed") && !item.needsReview && item.direction !== "unknown" && Boolean(item.companyId) && Boolean(item.data);
+  const reviewedOrExact = item.status === "reviewed" || (item.status === "extracted" && item.source === "efactura");
+  return reviewedOrExact && !item.needsReview && item.direction !== "unknown" && Boolean(item.companyId) && Boolean(item.data);
 }
 
 function statusLabel(item) {
-  if (item.status === "extracted") return isExportable(item) ? t("statusReady") : t("statusNeedsReview");
+  if (item.status === "extracted" || item.status === "reviewed") {
+    if (isExportable(item)) return item.status === "reviewed" ? t("status_reviewed") : t("statusReady");
+    return t("statusNeedsReview");
+  }
   return t(`status_${item.status}`);
 }
 
@@ -638,7 +655,7 @@ function renderQueueItem(item) {
   const actions = el("div", { className: "saga-queue-actions" });
   if ((item.status === "extracted" || item.status === "reviewed") && item.data) {
     actions.appendChild(el("button", { className: "btn btn-sm", text: t("btnReview"), onclick: () => openReview(item) }));
-    if (isExportable(item)) actions.appendChild(el("button", { className: "btn btn-sm btn-primary", text: t("btnExportXml"), onclick: () => exportSagaItems([item.id]) }));
+    if (isExportable(item)) actions.appendChild(el("button", { className: "btn btn-sm btn-primary btn-export-xml", text: t("btnExportXml"), onclick: () => exportSagaItems([item.id]) }));
   }
   if ((item.status === "failed" || item.status === "nonInvoice") && item.headerMessageId) {
     actions.appendChild(el("button", { className: "btn btn-sm", text: t("btnRetry"), onclick: () => retrySagaItem(item.id) }));
@@ -660,9 +677,19 @@ function reportExport(result) {
   else flash(status, failed.length ? t("exportPartial", [ok, failed.length, failed[0].error]) : t("exportDone", [ok]), failed.length > 0, 10000);
 }
 
-async function exportSagaItems(itemIds) {
-  reportExport(await send("sagaExportItems", { itemIds }));
-  await loadSagaQueue();
+async function withExportLock(fn) {
+  const buttons = [...document.querySelectorAll("#btnSagaExportAll, .btn-export-xml")];
+  buttons.forEach((b) => (b.disabled = true));
+  try {
+    reportExport(await fn());
+  } finally {
+    buttons.forEach((b) => (b.disabled = false));
+    await loadSagaQueue();
+  }
+}
+
+function exportSagaItems(itemIds) {
+  return withExportLock(() => send("sagaExportItems", { itemIds }));
 }
 
 async function retrySagaItem(id) {
@@ -683,10 +710,7 @@ function bindSagaEvents() {
   $("btnSaveCompany").addEventListener("click", saveSagaCompany);
   $("btnCancelCompany").addEventListener("click", hideCompanyForm);
   $("btnAnafFill").addEventListener("click", anafFill);
-  $("btnSagaExportAll").addEventListener("click", async () => {
-    reportExport(await send("sagaExportAll"));
-    await loadSagaQueue();
-  });
+  $("btnSagaExportAll").addEventListener("click", () => withExportLock(() => send("sagaExportAll")));
   $("btnSagaClearQueue").addEventListener("click", async () => {
     if (!confirm(t("confirmClearQueue"))) return;
     await send("sagaClearQueue");
@@ -765,13 +789,6 @@ function lineRow(line = {}) {
   return row;
 }
 
-function parseLocalNumber(value) {
-  const s = String(value || "").trim().replace(/\s/g, "");
-  if (!s) return null;
-  const n = Number(s.includes(",") && !s.includes(".") ? s.replace(",", ".") : s.replace(/,/g, ""));
-  return Number.isFinite(n) ? n : null;
-}
-
 function collectReview() {
   const data = { ...currentReview.data };
   for (const input of $("reviewForm").querySelectorAll("[data-key]")) {
@@ -782,7 +799,9 @@ function collectReview() {
     for (const input of row.querySelectorAll("[data-line]")) line[input.dataset.line] = input.value.trim();
     return line;
   });
-  return { data, direction: $("reviewDirection").value, companyId: $("reviewCompany").value || null };
+  const direction = $("reviewDirection").value;
+  // "unknown" means: let the background derive the direction from the company and CIFs.
+  return { data, direction: direction === "unknown" ? undefined : direction, companyId: $("reviewCompany").value || null };
 }
 
 function renderValidation(validation) {
@@ -818,8 +837,8 @@ function recalcTotals() {
   let net = 0;
   let vat = 0;
   for (const row of $("reviewLines").querySelectorAll("tr")) {
-    net += parseLocalNumber(row.querySelector('[data-line="valoare"]').value) || 0;
-    vat += parseLocalNumber(row.querySelector('[data-line="tva"]').value) || 0;
+    net += Text.parseAmount(row.querySelector('[data-line="valoare"]').value) || 0;
+    vat += Text.parseAmount(row.querySelector('[data-line="tva"]').value) || 0;
   }
   const set = (key, value) => {
     $("reviewForm").querySelector(`[data-key="${key}"]`).value = (Math.round(value * 100) / 100).toFixed(2);

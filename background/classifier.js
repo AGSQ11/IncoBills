@@ -72,9 +72,23 @@ const Classifier = {
     }
   },
 
+  _storedOk: null, // cached copy of backendStatus.ok (null = not read yet)
+
   async _recordSuccess() {
-    if (this._consecutiveFailures === 0) return;
     this._consecutiveFailures = 0;
+    if (this._storedOk === null) {
+      const status = await Storage.getData(DATA_KEYS.BACKEND_STATUS, { ok: true });
+      this._storedOk = status.ok !== false;
+    }
+    if (this._storedOk) return;
+    this._storedOk = true;
+    await Storage.set({ [DATA_KEYS.BACKEND_STATUS]: { ok: true, updatedAt: new Date().toISOString() } });
+  },
+
+  /** Forget old failures (e.g. after the user changes the backend). */
+  async resetStatus() {
+    this._consecutiveFailures = 0;
+    this._storedOk = true;
     await Storage.set({ [DATA_KEYS.BACKEND_STATUS]: { ok: true, updatedAt: new Date().toISOString() } });
   },
 
@@ -87,6 +101,7 @@ const Classifier = {
       failures: this._consecutiveFailures,
       updatedAt: new Date().toISOString(),
     };
+    this._storedOk = false;
     await Storage.set({ [DATA_KEYS.BACKEND_STATUS]: status }).catch(() => {});
     console.warn(`IncoBills: ${backend} failed (${this._consecutiveFailures}x), using keywords:`, status.error);
 

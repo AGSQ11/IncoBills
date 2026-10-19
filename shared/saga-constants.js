@@ -40,6 +40,7 @@ const SAGA_COMPANY_TEMPLATE = {
 };
 
 const SAGA_QUEUE_STATUS = {
+  PENDING: "pending",
   EXTRACTED: "extracted",
   REVIEWED: "reviewed",
   EXPORTED: "exported",
@@ -59,7 +60,11 @@ const SAGA_LIMITS = {
   maxXmlBytes: 10 * 1024 * 1024,
   maxZipEntries: 20,
   maxPdfPagesForText: 15,
-  maxTextChars: 15000,
+  maxTextChars: 12000,
+  /** Attachment bytes kept in memory for queued jobs; above this, jobs read the email again. */
+  maxQueuedBytes: 100 * 1024 * 1024,
+  /** Ollama context window for extraction (prompt + document + JSON answer). */
+  ollamaExtractContext: 16384,
 };
 
 /** UN/ECE Rec. 20 unit codes (e-Factura) → units used in SAGA. */

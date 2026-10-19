@@ -43,9 +43,19 @@ const LLM = {
     }
   },
 
-  /** Claude and OpenAI send data to a third party; Ollama stays local. */
-  isCloud(backend) {
-    return backend === "claude" || backend === "openai";
+  /**
+   * True if data leaves this computer: Claude, OpenAI, or an Ollama server
+   * that is not on localhost.
+   */
+  isRemote(provider) {
+    if (!provider) return false;
+    if (provider.backend !== "ollama") return true;
+    try {
+      const host = new URL(provider.baseUrl).hostname.replace(/^\[|\]$/g, "");
+      return !["localhost", "127.0.0.1", "::1"].includes(host);
+    } catch {
+      return true;
+    }
   },
 
   isOfficialOpenAI(baseUrl) {
@@ -195,7 +205,7 @@ const LLM = {
     throw lastError;
   },
 
-  async _ollama({ provider, system, prompt, schema, maxTokens, timeoutMs, retries }) {
+  async _ollama({ provider, system, prompt, schema, maxTokens, timeoutMs, retries, numCtx }) {
     const formats = [schema, "json"];
     let lastError = null;
     for (const format of formats) {
@@ -209,7 +219,7 @@ const LLM = {
               model: provider.model,
               stream: false,
               format,
-              options: { temperature: 0, num_predict: Math.min(maxTokens, 4096) },
+              options: { temperature: 0, num_predict: Math.min(maxTokens, 4096), ...(numCtx ? { num_ctx: numCtx } : {}) },
               messages: [
                 { role: "system", content: system },
                 { role: "user", content: prompt },

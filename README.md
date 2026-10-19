@@ -29,7 +29,7 @@ Turns on when you add at least one of your companies.
 - **PDF invoices** — extracted by Claude/OpenAI (native PDF input, only after your explicit consent) or locally with Ollama (text read by the bundled pdf.js).
 - **ANAF lookup** — partner name, address, trade register number, VAT status (correct `RO` prefix), *TVA la încasare* and inactive status from the public ANAF registry. Only the CIF and the invoice date are sent.
 - **Validation** — line sums, VAT sums, totals, CIF check digit, IBAN, dates and VAT rates (21% since 2025-08-01). Problems block the export until you fix them.
-- **Review editor** — edit header, parties and lines, then mark the invoice as reviewed.
+- **Review editor** — edit header, parties and lines, then mark the invoice as reviewed. Invoices read by the AI from a PDF always need this review before export; e-Factura invoices without errors are ready at once.
 - **Duplicates** — the same supplier + invoice number + date is never queued twice.
 - **Export** — one SAGA XML per invoice in `Downloads/SAGA-Import/`.
 
@@ -67,7 +67,7 @@ Click the IncoBills toolbar icon → **Settings**.
 ## Privacy
 
 - **Classification:** sender, subject, attachment names and the first 1000 characters of the body go to the selected AI backend. With hybrid mode, many emails need no AI call at all. Ollama and keywords stay on your computer.
-- **SAGA PDF extraction:** the **full PDF attachment** goes to Claude/OpenAI — only after you tick the consent box in the SAGA settings. Invoices can contain personal data (GDPR). Without consent, use Ollama.
+- **SAGA PDF extraction:** the **full PDF attachment** goes to Claude/OpenAI (or the text to a remote Ollama) — only after you tick the consent box in the SAGA settings. Invoices can contain personal data (GDPR). Without consent, use Ollama on this computer.
 - **e-Factura XML:** parsed locally, never uploaded.
 - **ANAF lookup:** only the CIF number and a date go to `webservicesp.anaf.ro`. You can turn it off.
 - API keys are stored in Thunderbird's extension storage on your computer.

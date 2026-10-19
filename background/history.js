@@ -10,7 +10,6 @@
 
 const History = {
   _processed: null, // Map<key, timestamp>
-  _legacyIds: null, // Set of Thunderbird ids from 1.0/1.1 history entries (no Message-ID stored)
   _dirty: false,
   _flushTimer: null,
 
@@ -32,13 +31,7 @@ const History = {
   async isProcessed(message) {
     const key = this.processedKey(message);
     const set = await this._loadProcessed();
-    if (key && set.has(key)) return true;
-    // Entries written by 1.0/1.1 only have the Thunderbird message id.
-    if (!this._legacyIds) {
-      const history = await this.getAll();
-      this._legacyIds = new Set(history.filter((e) => !e.headerMessageId && e.messageId != null).map((e) => e.messageId));
-    }
-    return Boolean(message && message.id != null && this._legacyIds.has(message.id));
+    return Boolean(key && set.has(key));
   },
 
   async markProcessed(message) {
@@ -78,10 +71,8 @@ const History = {
 
   async resetProcessed() {
     this._processed = new Map();
-    this._legacyIds = new Set();
     this._dirty = false;
     await Storage.set({ [DATA_KEYS.PROCESSED]: {} });
-    await Storage.update(DATA_KEYS.HISTORY, (list) => list.map((e) => ({ ...e, messageId: null })), []);
   },
 
   // ---- History ----
@@ -141,8 +132,15 @@ const History = {
     );
   },
 
+  async updateEntry(historyId, changes) {
+    await Storage.update(
+      DATA_KEYS.HISTORY,
+      (list) => list.map((e) => (e.id === historyId ? { ...e, ...changes } : e)),
+      []
+    );
+  },
+
   async clear() {
-    this._legacyIds = null;
     await Storage.set({ [DATA_KEYS.HISTORY]: [] });
   },
 

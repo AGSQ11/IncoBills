@@ -16,6 +16,7 @@ browser.notifications.onClicked.addListener((notificationId) => {
 });
 
 ready.then(() => Menus.init()).catch((err) => console.error("IncoBills: menu setup failed", err));
+ready.then(() => SAGAExport.resumePending()).catch((err) => console.error("[SAGA] resume failed", err));
 
 // Live scan progress for the options page.
 browser.runtime.onConnect.addListener((port) => {
@@ -53,8 +54,11 @@ async function handleMessage(message) {
       return Storage.getSettings();
     case "saveSettings":
       return respond(async () => {
-        await Storage.saveSettings(message.data);
+        const before = await Storage.getSettings();
+        const saved = await Storage.saveSettings(message.data);
         FolderManager.clearCache();
+        const backendKeys = ["aiBackend", "claudeApiUrl", "claudeApiKey", "openaiApiUrl", "openaiApiKey", "ollamaUrl"];
+        if (backendKeys.some((key) => key in saved && saved[key] !== before[key])) await Classifier.resetStatus();
         return { success: true };
       });
     case "getAccounts":
@@ -65,8 +69,11 @@ async function handleMessage(message) {
       return Storage.get("enabled");
     case "setEnabled":
       return respond(async () => (await Storage.saveSettings({ enabled: Boolean(message.enabled) }), { success: true }));
-    case "getBackendStatus":
-      return Storage.getData(DATA_KEYS.BACKEND_STATUS, { ok: true });
+    case "getBackendStatus": {
+      // Only report failures of the backend that is selected now.
+      const [status, settings] = await Promise.all([Storage.getData(DATA_KEYS.BACKEND_STATUS, { ok: true }), Storage.getSettings()]);
+      return status.ok === false && status.backend !== settings.aiBackend ? { ok: true } : status;
+    }
 
     // ---- Scan ----
     case "estimateScan":

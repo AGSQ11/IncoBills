@@ -53,6 +53,13 @@ function createEnv({ storageLatencyMs = 0, scripts, quiet = true } = {}) {
     attachmentFiles: {},
   };
 
+  // Thunderbird 128 MailFolder objects have no parentFolderId; the mock keeps it internally.
+  const pub = (folder) => {
+    if (!folder) return folder;
+    const { parentFolderId, ...rest } = folder;
+    return structuredClone(rest);
+  };
+
   const later = async () => {
     if (storageLatencyMs) await sleep(storageLatencyMs);
   };
@@ -129,10 +136,19 @@ function createEnv({ storageLatencyMs = 0, scripts, quiet = true } = {}) {
       async get(id) {
         const folder = mail.folders.find((f) => f.id === id);
         if (!folder) throw new Error("folder not found");
-        return structuredClone(folder);
+        return pub(folder);
       },
       async getSubFolders(id) {
-        return structuredClone(mail.folders.filter((f) => f.parentFolderId === id));
+        return mail.folders.filter((f) => f.parentFolderId === id).map(pub);
+      },
+      async getParentFolders(id) {
+        const out = [];
+        let current = mail.folders.find((f) => f.id === id);
+        while (current && current.parentFolderId) {
+          current = mail.folders.find((f) => f.id === current.parentFolderId);
+          if (current) out.push(pub(current));
+        }
+        return out;
       },
       async create(parentId, name) {
         await sleep(5);
@@ -147,14 +163,12 @@ function createEnv({ storageLatencyMs = 0, scripts, quiet = true } = {}) {
         };
         mail.folders.push(folder);
         createdFolders.push(folder);
-        return structuredClone(folder);
+        return pub(folder);
       },
       async query({ accountId, name, specialUse }) {
-        return structuredClone(
-          mail.folders.filter(
-            (f) => (!accountId || f.accountId === accountId) && (!name || f.name === name) && (!specialUse || (f.specialUse || []).some((s) => specialUse.includes(s)))
-          )
-        );
+        return mail.folders
+          .filter((f) => (!accountId || f.accountId === accountId) && (!name || f.name === name) && (!specialUse || (f.specialUse || []).some((s) => specialUse.includes(s))))
+          .map(pub);
       },
     },
     messages: {
@@ -174,7 +188,7 @@ function createEnv({ storageLatencyMs = 0, scripts, quiet = true } = {}) {
         moved.push({ ids, folderId });
         for (const id of ids) {
           const m = mail.messages.find((x) => x.id === id);
-          if (m) m.folder = structuredClone(mail.folders.find((f) => f.id === folderId));
+          if (m) m.folder = pub(mail.folders.find((f) => f.id === folderId));
         }
       },
       async copy(ids, folderId) {
@@ -225,7 +239,7 @@ function createEnv({ storageLatencyMs = 0, scripts, quiet = true } = {}) {
         ? { contentType: "multipart/alternative", parts: [{ contentType: "text/plain", body }, { contentType: "text/html", body: html }] }
         : { contentType: "text/plain", body };
       const folder = message.folder || mail.folders[0];
-      const record = { date: new Date().toISOString(), author: "Sender <sender@example.com>", subject: "", headerMessageId: `${message.id}@test`, ...message, folder: structuredClone(folder) };
+      const record = { date: new Date().toISOString(), author: "Sender <sender@example.com>", subject: "", headerMessageId: `${message.id}@test`, ...message, folder: pub(folder) };
       mail.messages.push(record);
       mail.full[record.id] = full;
       mail.attachments[record.id] = attachments;
