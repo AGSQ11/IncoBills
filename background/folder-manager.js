@@ -1,185 +1,164 @@
 /**
- * IncoBills — AI-Powered Invoice Detection for Thunderbird
- * https://github.com/serverspan/incobills
+ * IncoBills — folder manager. Finds or creates "<Invoices>/YYYY-MM" per
+ * account (or in one unified account) and moves/copies messages there.
  *
- * Folder Manager
- * Creates and caches "Invoices/YYYY-MM" folder trees per account or unified.
- * Handles IMAP, POP3, and local folder accounts with fallbacks.
- *
- * @author    ServerSpan <https://www.serverspan.com>
- * @copyright 2026 ServerSpan
- * @license   MIT
- * @version   1.0.0
+ * @license MIT
  */
 
 const FolderManager = {
-  // cache key → folderId  (key = "acctId" for parent, "acctId:YYYY-MM" for monthly)
-  _cache: {},
+  _cache: {}, // cacheKey → folderId
+  _inflight: new Map(), // cacheKey → Promise<folderId>
 
-  // ---- Public API ----
-
-  async moveToInvoices(messageId, sourceAccountId, messageDate) {
-    const settings = await Storage.getAll();
-    const targetFolderId = await this.getTargetFolder(sourceAccountId, messageDate);
-    const action = settings.mailAction || "move";
-
-    if (action === "copy") {
-      await browser.messages.copy([messageId], targetFolderId);
-      return "copied";
-    }
-
-    // Move (with fallback)
-    try {
-      await browser.messages.move([messageId], targetFolderId);
-    } catch (moveErr) {
-      console.warn("IncoBills: move() failed, trying copy+delete:", moveErr.message);
-      try {
-        await browser.messages.copy([messageId], targetFolderId);
-        await browser.messages.delete([messageId], false);
-      } catch (copyErr) {
-        throw new Error(`Failed to move message: ${moveErr.message}`);
-      }
-    }
-    return "moved";
+  /** Run `factory` once per key at a time; parallel callers share the promise. */
+  _once(key, factory) {
+    if (this._inflight.has(key)) return this._inflight.get(key);
+    const promise = factory().finally(() => this._inflight.delete(key));
+    this._inflight.set(key, promise);
+    return promise;
   },
 
-  async getTargetFolder(sourceAccountId, messageDate) {
-    const settings = await Storage.getAll();
-    const folderName = settings.folderName || "Invoices";
-
-    // Determine which account holds the Invoices tree
-    let targetAccountId;
-    if (settings.folderMode === "unified") {
-      targetAccountId = settings.unifiedAccountId;
-      if (!targetAccountId) {
-        // Auto-pick first account
-        const accounts = await browser.accounts.list();
-        targetAccountId = accounts.length > 0 ? accounts[0].id : sourceAccountId;
-      }
-    } else {
-      targetAccountId = sourceAccountId;
-    }
-
-    // Ensure the parent folder (e.g. "Invoices") exists
-    const parentId = await this.ensureParentFolder(targetAccountId, folderName);
-
-    // Compute monthly subfolder name
-    const date = messageDate ? new Date(messageDate) : new Date();
-    const monthKey = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
-
-    // Check cache
-    const cacheKey = `${targetAccountId}:${monthKey}`;
-    if (this._cache[cacheKey]) {
-      try {
-        await browser.folders.get(this._cache[cacheKey]);
-        return this._cache[cacheKey];
-      } catch {
-        delete this._cache[cacheKey];
-      }
-    }
-
-    // Look for existing monthly subfolder
+  async _cachedFolder(key) {
+    const id = this._cache[key];
+    if (!id) return null;
     try {
-      const subFolders = await browser.folders.getSubFolders(parentId, false);
-      const existing = subFolders.find((f) => f.name === monthKey);
-      if (existing) {
-        this._cache[cacheKey] = existing.id;
-        return existing.id;
-      }
+      await browser.folders.get(id);
+      return id;
     } catch {
-      // getSubFolders may fail, try creating directly
-    }
-
-    // Create the monthly subfolder
-    try {
-      const newFolder = await browser.folders.create(parentId, monthKey);
-      this._cache[cacheKey] = newFolder.id;
-      console.log(`IncoBills: Created "${folderName}/${monthKey}" in account ${targetAccountId}`);
-      return newFolder.id;
-    } catch (err) {
-      console.warn(`IncoBills: Can't create monthly folder "${monthKey}":`, err.message);
-      // Fall back to the parent folder itself
-      return parentId;
+      delete this._cache[key];
+      return null;
     }
   },
 
-  // ---- Parent folder creation (with fallback chain) ----
+  /** True if the folder is inside the invoices tree (any path segment equals the name). */
+  isInvoicesFolder(folder, folderName) {
+    if (!folder || !folder.path) return false;
+    const target = String(folderName || DEFAULTS.folderName).toLowerCase();
+    return folder.path.split("/").some((segment) => segment.toLowerCase() === target);
+  },
 
-  async ensureParentFolder(accountId, folderName) {
-    const cacheKey = accountId;
+  /**
+   * Move or copy one message into the invoices tree.
+   * @returns {Promise<{action: "moved"|"copied"|"already", folderId: string}>}
+   */
+  async moveToInvoices(message, sourceAccountId, settingsArg) {
+    const settings = settingsArg || (await Storage.getSettings());
+    const folderId = await this.getTargetFolder(sourceAccountId, message.date, settings);
+    if (message.folder && message.folder.id === folderId) return { action: "already", folderId };
 
-    // Check cache
-    if (this._cache[cacheKey]) {
+    if (settings.mailAction === "copy") {
+      await browser.messages.copy([message.id], folderId);
+      return { action: "copied", folderId };
+    }
+    // messages.move() handles cross-account moves itself (copy + delete inside Thunderbird).
+    await browser.messages.move([message.id], folderId);
+    return { action: "moved", folderId };
+  },
+
+  async getTargetFolder(sourceAccountId, messageDate, settingsArg) {
+    const settings = settingsArg || (await Storage.getSettings());
+    const folderName = settings.folderName || DEFAULTS.folderName;
+
+    let accountId = sourceAccountId;
+    if (settings.folderMode === "unified") {
+      accountId = settings.unifiedAccountId;
+      if (!accountId) {
+        const accounts = await browser.accounts.list();
+        accountId = accounts.length > 0 ? accounts[0].id : sourceAccountId;
+      }
+    }
+
+    const parentId = await this.ensureParentFolder(accountId, folderName, settings);
+    const monthKey = Text.monthKey(messageDate);
+    const key = `${accountId}:${folderName}:${monthKey}`;
+
+    const cached = await this._cachedFolder(key);
+    if (cached) return cached;
+
+    return this._once(key, async () => {
       try {
-        await browser.folders.get(this._cache[cacheKey]);
-        return this._cache[cacheKey];
+        const subFolders = await browser.folders.getSubFolders(parentId, false);
+        const existing = subFolders.find((f) => f.name === monthKey);
+        if (existing) return (this._cache[key] = existing.id);
       } catch {
-        delete this._cache[cacheKey];
+        /* fall through to create */
       }
-    }
-
-    // Search for existing folder
-    const existing = await browser.folders.query({ accountId, name: folderName });
-    if (existing.length > 0) {
-      this._cache[cacheKey] = existing[0].id;
-      return existing[0].id;
-    }
-
-    // Strategy 1: under account root
-    const account = await browser.accounts.get(accountId);
-    if (account && account.rootFolder) {
       try {
-        const f = await browser.folders.create(account.rootFolder.id, folderName);
-        this._cache[cacheKey] = f.id;
-        console.log(`IncoBills: Created "${folderName}" under root of ${accountId}`);
-        return f.id;
+        const created = await browser.folders.create(parentId, monthKey);
+        console.log(`IncoBills: created "${folderName}/${monthKey}" in account ${accountId}`);
+        return (this._cache[key] = created.id);
       } catch (err) {
-        console.warn(`IncoBills: Can't create under root of ${accountId}:`, err.message);
+        // Another client may have created it in the meantime: look again.
+        try {
+          const again = await browser.folders.getSubFolders(parentId, false);
+          const found = again.find((f) => f.name === monthKey);
+          if (found) return (this._cache[key] = found.id);
+        } catch {
+          /* ignore */
+        }
+        console.warn(`IncoBills: cannot create monthly folder "${monthKey}":`, err.message);
+        return parentId;
       }
-    }
+    });
+  },
 
-    // Strategy 2: sibling of inbox
-    try {
-      const inboxFolders = await browser.folders.query({ accountId, specialUse: ["inbox"] });
-      if (inboxFolders.length > 0 && inboxFolders[0].parentFolderId) {
-        const f = await browser.folders.create(inboxFolders[0].parentFolderId, folderName);
-        this._cache[cacheKey] = f.id;
-        return f.id;
+  async ensureParentFolder(accountId, folderName, settingsArg) {
+    const settings = settingsArg || (await Storage.getSettings());
+    const key = `${accountId}:${folderName}`;
+    const cached = await this._cachedFolder(key);
+    if (cached) return cached;
+
+    return this._once(key, async () => {
+      const existing = await browser.folders.query({ accountId, name: folderName });
+      if (existing.length > 0) {
+        // Prefer the top-most folder with this name (e.g. "/Invoices" over "/Archive/Invoices").
+        const depth = (f) => (f.path || "").split("/").length;
+        existing.sort((a, b) => depth(a) - depth(b));
+        return (this._cache[key] = existing[0].id);
       }
-    } catch (err) {
-      console.warn(`IncoBills: Can't create as inbox sibling in ${accountId}:`, err.message);
-    }
 
-    // Strategy 3: Local Folders
-    const localId = await this._findLocalFoldersFolder(folderName);
-    if (localId) {
-      this._cache[cacheKey] = localId;
-      return localId;
-    }
+      const account = await browser.accounts.get(accountId);
+      if (account && account.rootFolder) {
+        try {
+          const created = await browser.folders.create(account.rootFolder.id, folderName);
+          console.log(`IncoBills: created "${folderName}" in account ${accountId}`);
+          return (this._cache[key] = created.id);
+        } catch (err) {
+          console.warn(`IncoBills: cannot create "${folderName}" under the root of ${accountId}:`, err.message);
+        }
+      }
 
-    throw new Error(
-      `Could not create "${folderName}" folder for account ${accountId}. ` +
-      `Try creating it manually in Thunderbird first.`
-    );
+      try {
+        const inbox = await browser.folders.query({ accountId, specialUse: ["inbox"] });
+        if (inbox.length > 0 && inbox[0].parentFolderId) {
+          const created = await browser.folders.create(inbox[0].parentFolderId, folderName);
+          return (this._cache[key] = created.id);
+        }
+      } catch (err) {
+        console.warn(`IncoBills: cannot create "${folderName}" next to the inbox of ${accountId}:`, err.message);
+      }
+
+      // Local Folders keeps mail only on this computer, so it is opt-in.
+      if (settings.allowLocalFoldersFallback) {
+        const localId = await this._findLocalFoldersFolder(folderName);
+        if (localId) return (this._cache[key] = localId);
+      }
+
+      throw new Error(t("errCannotCreateFolder", [folderName]));
+    });
   },
 
   async _findLocalFoldersFolder(folderName) {
     const accounts = await browser.accounts.list();
-    for (const acct of accounts) {
-      const isLocal =
-        acct.type === "none" ||
-        (acct.name && acct.name.toLowerCase().includes("local folder"));
-      if (!isLocal) continue;
-
-      const existing = await browser.folders.query({ accountId: acct.id, name: folderName });
+    for (const account of accounts) {
+      if (account.type !== "none" && account.type !== "local") continue;
+      const existing = await browser.folders.query({ accountId: account.id, name: folderName });
       if (existing.length > 0) return existing[0].id;
-
       try {
-        const f = await browser.folders.create(acct.rootFolder.id, folderName);
-        console.log(`IncoBills: Created "${folderName}" in Local Folders`);
-        return f.id;
+        const created = await browser.folders.create(account.rootFolder.id, folderName);
+        console.log(`IncoBills: created "${folderName}" in Local Folders`);
+        return created.id;
       } catch (err) {
-        console.warn("IncoBills: Can't create in Local Folders:", err.message);
+        console.warn("IncoBills: cannot create the folder in Local Folders:", err.message);
       }
     }
     return null;

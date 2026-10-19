@@ -1,199 +1,113 @@
 /**
- * IncoBills SAGA Export — Company Registry
+ * IncoBills SAGA Export — registry of the user's own companies.
  *
- * CRUD operations for managing companies in browser.storage.local.
- * Each company maps a business name to its fiscal data for SAGA XML generation.
+ * @license MIT
  */
 
 const CompanyRegistry = {
-  /**
-   * Get all registered companies.
-   * @returns {Promise<Array>}
-   */
   async getAll() {
-    const result = await browser.storage.local.get(SAGA_STORAGE_KEYS.COMPANIES)
-    return result[SAGA_STORAGE_KEYS.COMPANIES] || []
+    const list = await Storage.getData(SAGA_STORAGE_KEYS.COMPANIES, []);
+    return Array.isArray(list) ? list : [];
   },
 
-  /**
-   * Get a single company by ID.
-   * @param {string} id
-   * @returns {Promise<Object|null>}
-   */
   async getById(id) {
-    const companies = await this.getAll()
-    return companies.find((c) => c.id === id) || null
+    return (await this.getAll()).find((c) => c.id === id) || null;
   },
 
-  /**
-   * Find company by CIF (case-insensitive).
-   * @param {string} cif
-   * @returns {Promise<Object|null>}
-   */
+  /** Match by CIF; "RO12345678", "12345678" and "RO 1234 5678" are the same company. */
   async findByCIF(cif) {
-    if (!cif) return null
-    const companies = await this.getAll()
-    const normalized = cif.toUpperCase().trim()
-    return companies.find((c) => c.cif.toUpperCase().trim() === normalized) || null
+    if (!cif) return null;
+    return (await this.getAll()).find((c) => Fiscal.sameCompany(c.cif, cif)) || null;
   },
 
   /**
-   * Find company by name (fuzzy match for PDF extraction).
-   * Tries exact match first, then partial.
-   * @param {string} name
-   * @returns {Promise<Object|null>}
+   * Direction and own company for an invoice.
+   * Supplier is ours → iesiri. Client is ours → intrari. Both ours → iesiri (flagged by the validator).
    */
-  async findByName(name) {
-    if (!name) return null
-    const companies = await this.getAll()
-    const normalized = name.toLowerCase().trim()
-
-    // Exact match
-    let match = companies.find((c) => c.name.toLowerCase().trim() === normalized)
-    if (match) return match
-
-    // Partial match: company name appears in the text
-    match = companies.find((c) => normalized.includes(c.name.toLowerCase().trim()))
-    if (match) return match
-
-    // Reverse partial: text appears in company name
-    match = companies.find((c) => c.name.toLowerCase().trim().includes(normalized))
-    return match || null
+  async resolve(furnizorCif, clientCif) {
+    const supplier = await this.findByCIF(furnizorCif);
+    const client = await this.findByCIF(clientCif);
+    if (supplier) return { direction: SAGA_INVOICE_DIRECTION.IESIRI, company: supplier, intraGroup: Boolean(client) };
+    if (client) return { direction: SAGA_INVOICE_DIRECTION.INTRARI, company: client, intraGroup: false };
+    return { direction: SAGA_INVOICE_DIRECTION.UNKNOWN, company: null, intraGroup: false };
   },
 
-  /**
-   * Determine invoice direction based on CIF matching.
-   * @param {string} furnizorCif
-   * @param {string} clientCif
-   * @returns {Promise<string>} intrari | iesiri | unknown
-   */
   async determineDirection(furnizorCif, clientCif) {
-    const furnizor = await this.findByCIF(furnizorCif)
-    const client = await this.findByCIF(clientCif)
-
-    if (furnizor) return SAGA_INVOICE_DIRECTION.IESIRI
-    if (client) return SAGA_INVOICE_DIRECTION.INTRARI
-    return SAGA_INVOICE_DIRECTION.UNKNOWN
+    return (await this.resolve(furnizorCif, clientCif)).direction;
   },
 
-  /**
-   * Add a new company.
-   * @param {Object} company
-   * @returns {Promise<Object>} The saved company with generated ID
-   */
+  _clean(company) {
+    const out = {};
+    for (const key of Object.keys(SAGA_COMPANY_TEMPLATE)) {
+      if (key === "id") continue;
+      out[key] = String(company[key] ?? "").trim();
+    }
+    out.cif = Fiscal.normalizeCif(out.cif);
+    out.iban = out.iban.toUpperCase().replace(/\s+/g, "");
+    out.country = (out.country || "RO").toUpperCase();
+    return out;
+  },
+
   async add(company) {
-    const validated = this.validate(company)
-    if (!validated.valid) {
-      throw new Error(`Validation failed: ${validated.errors.join(", ")}`)
-    }
-
-    const companies = await this.getAll()
-    const newCompany = {
-      ...SAGA_COMPANY_TEMPLATE,
-      ...company,
-      id: company.id || crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    }
-
-    // Prevent duplicate CIF
-    const existing = await this.findByCIF(newCompany.cif)
-    if (existing) {
-      throw new Error(`Company with CIF ${newCompany.cif} already exists`)
-    }
-
-    companies.push(newCompany)
-    await browser.storage.local.set({ [SAGA_STORAGE_KEYS.COMPANIES]: companies })
-    return newCompany
+    const clean = this._clean(company);
+    const check = this.validate(clean);
+    if (!check.valid) throw new Error(check.errors.join("; "));
+    let created;
+    await Storage.update(
+      SAGA_STORAGE_KEYS.COMPANIES,
+      (list) => {
+        if (list.some((c) => Fiscal.sameCompany(c.cif, clean.cif))) throw new Error(t("errCompanyExists", [clean.cif]));
+        created = { ...SAGA_COMPANY_TEMPLATE, ...clean, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+        return [...list, created];
+      },
+      []
+    );
+    return created;
   },
 
-  /**
-   * Update an existing company.
-   * @param {string} id
-   * @param {Object} updates
-   * @returns {Promise<Object>}
-   */
   async update(id, updates) {
-    const companies = await this.getAll()
-    const index = companies.findIndex((c) => c.id === id)
-    if (index === -1) {
-      throw new Error(`Company with ID ${id} not found`)
-    }
-
-    const updated = { ...companies[index], ...updates, id }
-    const validated = this.validate(updated)
-    if (!validated.valid) {
-      throw new Error(`Validation failed: ${validated.errors.join(", ")}`)
-    }
-
-    companies[index] = updated
-    await browser.storage.local.set({ [SAGA_STORAGE_KEYS.COMPANIES]: companies })
-    return updated
+    let updated;
+    await Storage.update(
+      SAGA_STORAGE_KEYS.COMPANIES,
+      (list) => {
+        const index = list.findIndex((c) => c.id === id);
+        if (index === -1) throw new Error(t("errCompanyNotFound"));
+        const clean = this._clean({ ...list[index], ...updates });
+        const check = this.validate(clean);
+        if (!check.valid) throw new Error(check.errors.join("; "));
+        if (list.some((c, i) => i !== index && Fiscal.sameCompany(c.cif, clean.cif))) throw new Error(t("errCompanyExists", [clean.cif]));
+        updated = { ...list[index], ...clean, id };
+        const copy = list.slice();
+        copy[index] = updated;
+        return copy;
+      },
+      []
+    );
+    return updated;
   },
 
-  /**
-   * Delete a company by ID.
-   * @param {string} id
-   * @returns {Promise<boolean>}
-   */
   async delete(id) {
-    const companies = await this.getAll()
-    const filtered = companies.filter((c) => c.id !== id)
-    if (filtered.length === companies.length) return false
-
-    await browser.storage.local.set({ [SAGA_STORAGE_KEYS.COMPANIES]: filtered })
-    return true
+    let removed = false;
+    await Storage.update(
+      SAGA_STORAGE_KEYS.COMPANIES,
+      (list) => {
+        const filtered = list.filter((c) => c.id !== id);
+        removed = filtered.length !== list.length;
+        return filtered;
+      },
+      []
+    );
+    return removed;
   },
 
-  /**
-   * Validate company data.
-   * @param {Object} company
-   * @returns {Object} { valid: boolean, errors: string[] }
-   */
+  /** Name and CIF are required. Romanian CIF and IBAN must pass their check digits. */
   validate(company) {
-    const errors = []
-
-    if (!company.name || company.name.trim().length === 0) {
-      errors.push("Company name is required")
-    }
-    if (!company.cif || company.cif.trim().length === 0) {
-      errors.push("CIF is required")
-    }
-    if (!company.regCom || company.regCom.trim().length === 0) {
-      errors.push("Registrul Comertului is required")
-    }
-    if (!company.address || company.address.trim().length === 0) {
-      errors.push("Address is required")
-    }
-    if (!company.city || company.city.trim().length === 0) {
-      errors.push("City is required")
-    }
-    if (!company.county || company.county.trim().length === 0) {
-      errors.push("County is required")
-    }
-    if (!company.country || company.country.trim().length === 0) {
-      errors.push("Country is required")
-    }
-    if (!company.bank || company.bank.trim().length === 0) {
-      errors.push("Bank is required")
-    }
-    if (!company.iban || company.iban.trim().length === 0) {
-      errors.push("IBAN is required")
-    }
-    if (!company.phone || company.phone.trim().length === 0) {
-      errors.push("Phone is required")
-    }
-    if (!company.email || company.email.trim().length === 0) {
-      errors.push("Email is required")
-    }
-    if (!company.capital || company.capital.toString().trim().length === 0) {
-      errors.push("Capital is required")
-    }
-
-    return { valid: errors.length === 0, errors }
+    const errors = [];
+    if (!company.name) errors.push(t("valCompanyNameRequired"));
+    if (!company.cif) errors.push(t("valCompanyCifRequired"));
+    else if (Fiscal.isRomanianCif(company.cif) && !Fiscal.isValidRomanianCif(company.cif)) errors.push(t("valCifChecksum", [company.cif]));
+    if (company.iban && !Fiscal.isValidIban(company.iban)) errors.push(t("valIbanInvalid", [company.iban]));
+    if (company.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) errors.push(t("valEmailInvalid", [company.email]));
+    return { valid: errors.length === 0, errors };
   },
-}
-
-// Expose for module usage if needed
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = { CompanyRegistry }
-}
+};

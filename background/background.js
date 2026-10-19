@@ -1,132 +1,135 @@
 /**
- * IncoBills — AI-Powered Invoice Detection for Thunderbird
- * https://github.com/serverspan/incobills
+ * IncoBills — background entry point: listeners and messages from popup/options.
  *
- * Background Entry Point
- * Registers all event listeners and handles messaging from popup/options.
- *
- * @author    ServerSpan <https://www.serverspan.com>
- * @copyright 2026 ServerSpan
- * @license   MIT
- * @version   1.0.0
+ * @license MIT
  */
 
-// --- New mail listener ---
+const ready = Storage.migrate().catch((err) => console.error("IncoBills: migration failed", err));
+
 browser.messages.onNewMailReceived.addListener((folder, messages) => {
-  EmailMonitor.handleNewMail(folder, messages);
+  ready.then(() => EmailMonitor.handleNewMail(folder, messages)).catch((err) => console.error("IncoBills: new mail handler failed", err));
 });
 
-// --- Notification click: clear it ---
 browser.notifications.onClicked.addListener((notificationId) => {
   browser.notifications.clear(notificationId);
+  if (String(notificationId).startsWith("incobills")) browser.runtime.openOptionsPage().catch(() => {});
 });
 
-// --- Message handler for popup and options pages ---
-browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+ready.then(() => Menus.init()).catch((err) => console.error("IncoBills: menu setup failed", err));
+
+// Live scan progress for the options page.
+browser.runtime.onConnect.addListener((port) => {
+  if (port.name !== "scan" || (port.sender && port.sender.id !== browser.runtime.id)) return;
+  const unsubscribe = EmailMonitor.subscribe((state) => port.postMessage({ type: "progress", state }));
+  port.postMessage({ type: "progress", state: EmailMonitor.getScanState() });
+  port.onDisconnect.addListener(unsubscribe); // The scan continues when the page closes.
+});
+
+/** Run a handler; errors become { success: false, error }. */
+async function respond(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error("IncoBills:", err);
+    return { success: false, error: Text.shortError(err, 500) };
+  }
+}
+
+async function handleMessage(message) {
+  await ready;
   switch (message.type) {
+    // ---- General ----
     case "getStats":
       return History.getStats();
-
     case "getHistory":
       return History.getAll();
-
     case "getRecentHistory":
       return History.getRecent(message.count || 5);
-
     case "clearHistory":
-      return History.clear().then(() => ({ success: true }));
-
+      return respond(async () => (await History.clear(), { success: true }));
     case "exportCSV":
       return History.exportCSV();
-
     case "getSettings":
-      return Storage.getAll();
-
+      return Storage.getSettings();
     case "saveSettings":
-      return Storage.set(message.data).then(() => {
-        FolderManager.clearCache(); // folder name may have changed
+      return respond(async () => {
+        await Storage.saveSettings(message.data);
+        FolderManager.clearCache();
         return { success: true };
       });
-
     case "getAccounts":
-      return browser.accounts.list().then((accounts) =>
-        accounts.map((a) => ({ id: a.id, name: a.name, type: a.type }))
-      );
-
+      return (await browser.accounts.list()).map((a) => ({ id: a.id, name: a.name, type: a.type }));
     case "testBackend":
-      return Classifier.testBackend(message.backend, message.options)
-        .then(() => ({ success: true }))
-        .catch((err) => ({ success: false, error: err.message }));
-
-    case "scanExisting":
-      return EmailMonitor.scanExisting(
-        message.accountId,
-        message.fromDate,
-        message.toDate
-      );
-
+      return respond(async () => (await Classifier.testBackend(message.backend, message.options), { success: true }));
     case "getEnabled":
       return Storage.get("enabled");
-
     case "setEnabled":
-      return Storage.set({ enabled: message.enabled }).then(() => ({
-        success: true,
-      }));
+      return respond(async () => (await Storage.saveSettings({ enabled: Boolean(message.enabled) }), { success: true }));
+    case "getBackendStatus":
+      return Storage.getData(DATA_KEYS.BACKEND_STATUS, { ok: true });
 
-    // SAGA Export handlers
+    // ---- Scan ----
+    case "estimateScan":
+      return respond(async () => ({ success: true, estimate: await EmailMonitor.estimateScan(message.params || {}) }));
+    case "startScan":
+      return respond(async () => ({ success: true, state: EmailMonitor.startScan(message.params || {}) }));
+    case "cancelScan":
+      return { success: true, state: EmailMonitor.cancelScan() };
+    case "getScanState":
+      return EmailMonitor.getScanState();
+    case "resetProcessed":
+      return respond(async () => (await History.resetProcessed(), { success: true }));
+
+    // ---- Sender rules ----
+    case "getSenderRules":
+      return SenderRules.getAll();
+    case "removeSenderRule":
+      return respond(async () => (await SenderRules.remove(message.key), { success: true }));
+
+    // ---- SAGA ----
     case "sagaGetCompanies":
       return CompanyRegistry.getAll();
-
     case "sagaAddCompany":
-      return CompanyRegistry.add(message.data)
-        .then((company) => ({ success: true, company }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: true, company: await CompanyRegistry.add(message.data) }));
     case "sagaUpdateCompany":
-      return CompanyRegistry.update(message.id, message.data)
-        .then((company) => ({ success: true, company }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: true, company: await CompanyRegistry.update(message.id, message.data) }));
     case "sagaDeleteCompany":
-      return CompanyRegistry.delete(message.id)
-        .then(() => ({ success: true }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: await CompanyRegistry.delete(message.id) }));
+    case "sagaAnafLookup":
+      return respond(async () => {
+        const info = await ANAF.lookup(message.cif, message.date);
+        return info ? { success: true, info } : { success: false, error: t("errAnafNotFound") };
+      });
     case "sagaGetQueue":
       return SAGAExport.getQueue();
-
+    case "sagaGetSummary":
+      return SAGAExport.getSummary();
+    case "sagaUpdateQueueItem":
+      return respond(() => SAGAExport.updateItem(message.id, message.changes || {}, { markReviewed: Boolean(message.markReviewed) }));
     case "sagaRemoveQueueItem":
-      return SAGAExport.removeFromQueue(message.id)
-        .then(() => ({ success: true }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: await SAGAExport.removeFromQueue(message.id) }));
     case "sagaClearQueue":
-      return SAGAExport.clearQueue()
-        .then(() => ({ success: true }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => (await SAGAExport.clearQueue(), { success: true }));
+    case "sagaRetryQueueItem":
+      return respond(async () => ({ success: true, added: (await SAGAExport.retry(message.id)).length }));
     case "sagaExportItems":
-      return SAGAExport.exportItems(message.itemIds)
-        .then((results) => ({ success: true, results }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: true, results: await SAGAExport.exportItems(message.itemIds) }));
     case "sagaExportAll":
-      return SAGAExport.exportAll()
-        .then((results) => ({ success: true, results }))
-        .catch((err) => ({ success: false, error: err.message }));
-
-    case "sagaSaveSettings":
-      return SAGAExport.saveSettings(message.data)
-        .then(() => ({ success: true }))
-        .catch((err) => ({ success: false, error: err.message }));
-
+      return respond(async () => ({ success: true, results: await SAGAExport.exportAll() }));
     case "sagaGetSettings":
       return SAGAExport.getSettings();
+    case "sagaSaveSettings":
+      return respond(async () => (await SAGAExport.saveSettings(message.data), { success: true }));
 
     default:
-      return Promise.resolve({ error: "Unknown message type" });
+      return { success: false, error: `Unknown message type: ${message.type}` };
   }
+}
+
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (!message || typeof message.type !== "string") return undefined;
+  if (sender && sender.id && sender.id !== browser.runtime.id) return undefined;
+  return handleMessage(message);
 });
 
-// --- Startup log ---
-console.log("IncoBills: Extension loaded. Monitoring for invoices across all accounts.");
+console.log("IncoBills: extension loaded.");

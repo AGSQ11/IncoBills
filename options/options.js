@@ -1,739 +1,838 @@
 /**
- * IncoBills — AI-Powered Invoice Detection for Thunderbird
- * https://github.com/serverspan/incobills
+ * IncoBills — options page.
  *
- * Options Page Script
- *
- * @author    ServerSpan <https://www.serverspan.com>
- * @copyright 2026 ServerSpan
- * @license   MIT
- * @version   1.0.0
+ * @license MIT
  */
 
 const HISTORY_PAGE_SIZE = 50;
 let historyOffset = 0;
 let allHistory = [];
+let historySortDesc = true;
+let accounts = [];
+let companies = [];
+let queue = [];
+let currentSettings = null;
+let currentSagaSettings = null;
+let currentReview = null;
+let lastScanFinishedAt = null;
+
+const $ = (id) => document.getElementById(id);
+const send = (type, data = {}) => browser.runtime.sendMessage({ type, ...data });
+
+/** Create an element without innerHTML. */
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (value === undefined || value === null) continue;
+    if (key === "className") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else if (key === "dataset") Object.assign(node.dataset, value);
+    else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2), value);
+    else if (key in node && typeof value !== "string") node[key] = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of [].concat(children)) {
+    if (child === null || child === undefined || child === false) continue;
+    node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+  }
+  return node;
+}
+
+function clear(node) {
+  while (node.lastChild) node.removeChild(node.lastChild);
+}
+
+function flash(node, text, isError = false, ms = 6000) {
+  node.textContent = text;
+  node.classList.toggle("is-error", isError);
+  if (ms) setTimeout(() => {
+    if (node.textContent === text) node.textContent = "";
+  }, ms);
+}
+
+function senderName(from) {
+  const match = String(from || "").match(/^"?([^"<]+)"?\s*</);
+  return match ? match[1].trim() : String(from || "").split("@")[0] || from;
+}
+
+function backendLabel(backend) {
+  return t(`backendName_${backend}`) || backend;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
+  I18n.localizePage();
+  $("sortDate").textContent = `${t("colDate")} ▼`;
   await loadSettings();
-  await loadAccounts();
-  await loadHistory();
+  await Promise.all([loadAccounts(), loadSagaSettings(), loadHistory(), loadRules(), loadBackendStatus()]);
   await loadSagaCompanies();
   await loadSagaQueue();
   bindEvents();
   bindSagaEvents();
+  bindReview();
   setDefaultScanDates();
+  connectScanPort();
+  updateSagaWarnings();
+  if (location.hash === "#saga") $("saga").scrollIntoView();
 });
 
 // ============================================================
-//  Load settings into form
+//  Settings
 // ============================================================
 
 async function loadSettings() {
-  const s = await browser.runtime.sendMessage({ type: "getSettings" });
-
-  // Backend radio
+  const s = await send("getSettings");
+  currentSettings = s;
   const radio = document.querySelector(`input[name="aiBackend"][value="${s.aiBackend}"]`);
   if (radio) radio.checked = true;
-
-  // API fields
-  document.getElementById("claudeApiUrl").value = s.claudeApiUrl || "";
-  document.getElementById("claudeApiKey").value = s.claudeApiKey || "";
-  document.getElementById("claudeModel").value = s.claudeModel || "";
-  document.getElementById("openaiApiUrl").value = s.openaiApiUrl || "";
-  document.getElementById("openaiApiKey").value = s.openaiApiKey || "";
-  document.getElementById("openaiModel").value = s.openaiModel || "";
-  document.getElementById("ollamaUrl").value = s.ollamaUrl || "";
-  document.getElementById("ollamaModel").value = s.ollamaModel || "";
-
-  // Threshold
-  const slider = document.getElementById("confidenceThreshold");
-  slider.value = s.confidenceThreshold;
-  document.getElementById("thresholdValue").textContent = Number(s.confidenceThreshold).toFixed(2);
-
-  // Folder name
-  document.getElementById("folderName").value = s.folderName || "Invoices";
-
-  // Folder mode
-  const folderModeRadio = document.querySelector(`input[name="folderMode"][value="${s.folderMode || "perAccount"}"]`);
-  if (folderModeRadio) folderModeRadio.checked = true;
-
-  // Mail action
-  const mailActionRadio = document.querySelector(`input[name="mailAction"][value="${s.mailAction || "move"}"]`);
-  if (mailActionRadio) mailActionRadio.checked = true;
-
-  // Behavior
-  document.getElementById("autoMove").checked = s.autoMove !== false;
-  document.getElementById("showNotification").checked = s.showNotification !== false;
-  document.getElementById("notifyOnly").checked = s.notifyOnly === true;
+  for (const id of ["claudeApiUrl", "claudeApiKey", "claudeModel", "claudeExtractModel", "openaiApiUrl", "openaiApiKey", "openaiModel", "openaiExtractModel", "ollamaUrl", "ollamaModel", "ollamaExtractModel", "folderName"]) {
+    $(id).value = s[id] || "";
+  }
+  $("confidenceThreshold").value = s.confidenceThreshold;
+  $("thresholdValue").textContent = Number(s.confidenceThreshold).toFixed(2);
+  const folderMode = document.querySelector(`input[name="folderMode"][value="${s.folderMode || "perAccount"}"]`);
+  if (folderMode) folderMode.checked = true;
+  const mailAction = document.querySelector(`input[name="mailAction"][value="${s.mailAction || "move"}"]`);
+  if (mailAction) mailAction.checked = true;
+  $("hybridMode").checked = s.hybridMode !== false;
+  $("autoMove").checked = s.autoMove !== false;
+  $("showNotification").checked = s.showNotification !== false;
+  $("notifyOnly").checked = s.notifyOnly === true;
+  $("allowLocalFoldersFallback").checked = s.allowLocalFoldersFallback === true;
 }
 
-// ============================================================
-//  Load accounts
-// ============================================================
+async function loadSagaSettings() {
+  const s = await send("sagaGetSettings");
+  currentSagaSettings = s;
+  $("sagaExportSubdir").value = s.exportSubdirectory || "";
+  $("sagaAutoExtract").checked = s.autoExtractPDFs !== false;
+  $("sagaCloudConsent").checked = s.cloudConsent === true;
+  $("sagaAnafLookup").checked = s.anafLookup !== false;
+  $("sagaSkipDomestic").checked = s.skipDomesticSuppliers === true;
+}
 
 async function loadAccounts() {
-  const accounts = await browser.runtime.sendMessage({ type: "getAccounts" });
-  const settings = await browser.runtime.sendMessage({ type: "getSettings" });
+  accounts = await send("getAccounts");
+  const settings = currentSettings || (await send("getSettings"));
   const monitored = settings.monitoredAccounts || [];
+  const all = settings.monitorMode !== "selected";
 
-  const listEl = document.getElementById("accountsList");
-  const scanSelect = document.getElementById("scanAccount");
-  const unifiedSelect = document.getElementById("unifiedAccount");
-  while (listEl.lastChild) {
-    listEl.removeChild(listEl.lastChild);
-  }
-
-  // Clear and repopulate unified dropdown (keep first placeholder option)
+  const listEl = $("accountsList");
+  const scanSelect = $("scanAccount");
+  const unifiedSelect = $("unifiedAccount");
+  clear(listEl);
+  scanSelect.length = 1;
   unifiedSelect.length = 1;
 
   for (const account of accounts) {
-    // Checkbox list
-    const div = document.createElement("div");
-    div.className = "account-item";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "account-check";
-    checkbox.value = account.id;
-    checkbox.checked = monitored.length === 0 || monitored.includes(account.id);
-
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = account.name || account.id;
-
-    const typeSpan = document.createElement("span");
-    typeSpan.className = "account-type";
-    typeSpan.textContent = account.type || "";
-
-    div.appendChild(checkbox);
-    div.appendChild(nameSpan);
-    div.appendChild(typeSpan);
-    listEl.appendChild(div);
-
-    // Scan dropdown
-    const opt = document.createElement("option");
-    opt.value = account.id;
-    opt.textContent = account.name || account.id;
-    scanSelect.appendChild(opt);
-
-    // Unified account dropdown
-    const opt2 = document.createElement("option");
-    opt2.value = account.id;
-    opt2.textContent = account.name || account.id;
-    if (settings.unifiedAccountId === account.id) opt2.selected = true;
-    unifiedSelect.appendChild(opt2);
+    const checkbox = el("input", { type: "checkbox", className: "account-check", value: account.id, checked: all || monitored.includes(account.id) });
+    checkbox.addEventListener("change", updateAccountsWarning);
+    listEl.appendChild(el("label", { className: "account-item" }, [checkbox, el("span", { text: account.name || account.id }), el("span", { className: "account-type", text: account.type || "" })]));
+    scanSelect.appendChild(el("option", { value: account.id, text: account.name || account.id }));
+    unifiedSelect.appendChild(el("option", { value: account.id, text: account.name || account.id, selected: settings.unifiedAccountId === account.id }));
   }
-
-  if (accounts.length === 0) {
-    const emptyDiv = document.createElement("div");
-    emptyDiv.className = "loading";
-    emptyDiv.textContent = "No mail accounts found.";
-    listEl.appendChild(emptyDiv);
-  }
+  if (accounts.length === 0) listEl.appendChild(el("div", { className: "loading", text: t("noAccounts") }));
+  updateAccountsWarning();
 }
 
-// ============================================================
-//  Load history
-// ============================================================
-
-async function loadHistory() {
-  allHistory = await browser.runtime.sendMessage({ type: "getHistory" });
-  historyOffset = 0;
-  sortAndRender();
+function updateAccountsWarning() {
+  const checks = [...document.querySelectorAll(".account-check")];
+  $("accountsWarning").hidden = !(checks.length > 0 && checks.every((cb) => !cb.checked));
 }
 
-let historySortDesc = true;
-
-function sortAndRender() {
-  if (historySortDesc) {
-    allHistory.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
-  } else {
-    allHistory.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
-  }
-  historyOffset = 0;
-  renderHistoryPage();
-}
-
-function renderHistoryPage() {
-  const tbody = document.getElementById("historyBody");
-  const page = allHistory.slice(0, historyOffset + HISTORY_PAGE_SIZE);
-
-  if (page.length === 0) {
-    while (tbody.lastChild) {
-      tbody.removeChild(tbody.lastChild);
+/** Origins of custom API URLs that need an optional host permission. */
+function customOrigins() {
+  const patterns = new Set();
+  for (const id of ["claudeApiUrl", "openaiApiUrl", "ollamaUrl"]) {
+    const value = $(id).value.trim();
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      const origin = `${url.protocol}//${url.hostname}`;
+      if (!BUILTIN_HOST_ORIGINS.includes(origin)) patterns.add(`${url.protocol}//${url.hostname}/*`);
+    } catch {
+      /* invalid URL: the test button reports it */
     }
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 6;
-    td.className = "empty-cell";
-    td.textContent = "No history yet.";
-    tr.appendChild(td);
-    tbody.appendChild(tr);
-    document.getElementById("btnLoadMore").hidden = true;
-    return;
   }
-
-  while (tbody.lastChild) {
-    tbody.removeChild(tbody.lastChild);
-  }
-  for (const entry of page) {
-    const tr = document.createElement("tr");
-    const date = new Date(entry.timestamp);
-    const dateStr = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const conf = entry.classification ? Math.round(entry.classification.confidence * 100) + "%" : "-";
-    const actionClass = `action-${entry.action || "skipped"}`;
-
-    const tdDate = document.createElement("td");
-    tdDate.title = entry.timestamp;
-    tdDate.textContent = dateStr;
-
-    const tdFrom = document.createElement("td");
-    tdFrom.title = entry.from || "";
-    tdFrom.textContent = extractSenderName(entry.from || "");
-
-    const tdSubject = document.createElement("td");
-    tdSubject.title = entry.subject || "";
-    tdSubject.textContent = entry.subject || "(no subject)";
-
-    const tdConf = document.createElement("td");
-    tdConf.textContent = conf;
-
-    const tdBackend = document.createElement("td");
-    tdBackend.textContent = entry.backend || "-";
-
-    const tdAction = document.createElement("td");
-    tdAction.className = actionClass;
-    tdAction.textContent = entry.action || "-";
-
-    tr.appendChild(tdDate);
-    tr.appendChild(tdFrom);
-    tr.appendChild(tdSubject);
-    tr.appendChild(tdConf);
-    tr.appendChild(tdBackend);
-    tr.appendChild(tdAction);
-    tbody.appendChild(tr);
-  }
-
-  historyOffset = page.length;
-  document.getElementById("btnLoadMore").hidden = historyOffset >= allHistory.length;
+  return [...patterns];
 }
-
-// ============================================================
-//  Event binding
-// ============================================================
-
-function bindEvents() {
-  // Threshold slider live update
-  const slider = document.getElementById("confidenceThreshold");
-  slider.addEventListener("input", () => {
-    document.getElementById("thresholdValue").textContent = Number(slider.value).toFixed(2);
-  });
-
-  // Folder mode toggle: show/hide unified account dropdown
-  document.querySelectorAll('input[name="folderMode"]').forEach((radio) => {
-    radio.addEventListener("change", () => {
-      document.getElementById("unifiedAccountGroup").hidden =
-        document.querySelector('input[name="folderMode"]:checked').value !== "unified";
-    });
-  });
-  // Fire once to set initial state
-  document.getElementById("unifiedAccountGroup").hidden =
-    document.querySelector('input[name="folderMode"]:checked').value !== "unified";
-
-  // Save
-  document.getElementById("btnSave").addEventListener("click", saveSettings);
-
-  // Test buttons
-  document.getElementById("testClaude").addEventListener("click", (e) => {
-    e.preventDefault();
-    testBackend("claude", {
-      apiKey: document.getElementById("claudeApiKey").value,
-      apiUrl: document.getElementById("claudeApiUrl").value,
-    });
-  });
-  document.getElementById("testOpenai").addEventListener("click", (e) => {
-    e.preventDefault();
-    testBackend("openai", {
-      apiKey: document.getElementById("openaiApiKey").value,
-      apiUrl: document.getElementById("openaiApiUrl").value,
-    });
-  });
-  document.getElementById("testOllama").addEventListener("click", (e) => {
-    e.preventDefault();
-    testBackend("ollama", {
-      url: document.getElementById("ollamaUrl").value,
-      model: document.getElementById("ollamaModel").value,
-    });
-  });
-
-  // History
-  document.getElementById("sortDate").addEventListener("click", () => {
-    historySortDesc = !historySortDesc;
-    document.getElementById("sortDate").textContent =
-      historySortDesc ? "Date \u25BC" : "Date \u25B2";
-    sortAndRender();
-  });
-  document.getElementById("btnLoadMore").addEventListener("click", () => {
-    renderHistoryPage();
-  });
-  document.getElementById("btnExportCSV").addEventListener("click", exportCSV);
-  document.getElementById("btnClearHistory").addEventListener("click", async () => {
-    if (confirm("Clear all classification history? This cannot be undone.")) {
-      await browser.runtime.sendMessage({ type: "clearHistory" });
-      await loadHistory();
-    }
-  });
-
-  // Scan
-  document.getElementById("btnScan").addEventListener("click", startScan);
-}
-
-// ============================================================
-//  Save settings
-// ============================================================
 
 async function saveSettings() {
+  const status = $("saveStatus");
+  // permissions.request() must run first, inside the click handler.
+  const origins = customOrigins();
+  let permissionNote = "";
+  if (origins.length > 0) {
+    try {
+      const granted = await browser.permissions.request({ origins });
+      if (!granted) permissionNote = " " + t("warnPermissionDenied", [origins.join(", ")]);
+    } catch (err) {
+      permissionNote = " " + t("warnPermissionDenied", [origins.join(", ")]);
+    }
+  }
+
   const backend = document.querySelector('input[name="aiBackend"]:checked');
-  const accountChecks = document.querySelectorAll(".account-check");
-  const allChecked = Array.from(accountChecks).every((cb) => cb.checked);
-  const monitored = allChecked
-    ? []
-    : Array.from(accountChecks).filter((cb) => cb.checked).map((cb) => cb.value);
+  const checks = [...document.querySelectorAll(".account-check")];
+  const allChecked = checks.length === 0 || checks.every((cb) => cb.checked);
 
   const data = {
     aiBackend: backend ? backend.value : "keywords",
-    claudeApiUrl: document.getElementById("claudeApiUrl").value.trim() || "https://api.anthropic.com",
-    claudeApiKey: document.getElementById("claudeApiKey").value.trim(),
-    claudeModel: document.getElementById("claudeModel").value.trim() || "claude-haiku-4-5-20251001",
-    openaiApiUrl: document.getElementById("openaiApiUrl").value.trim() || "https://api.openai.com",
-    openaiApiKey: document.getElementById("openaiApiKey").value.trim(),
-    openaiModel: document.getElementById("openaiModel").value.trim() || "gpt-4o-mini",
-    ollamaUrl: document.getElementById("ollamaUrl").value.trim() || "http://127.0.0.1:11434",
-    ollamaModel: document.getElementById("ollamaModel").value.trim() || "llama3.2:3b",
-    confidenceThreshold: parseFloat(document.getElementById("confidenceThreshold").value),
-    folderName: document.getElementById("folderName").value.trim() || "Invoices",
+    claudeApiUrl: $("claudeApiUrl").value.trim() || DEFAULTS.claudeApiUrl,
+    claudeApiKey: $("claudeApiKey").value.trim(),
+    claudeModel: $("claudeModel").value.trim() || DEFAULTS.claudeModel,
+    claudeExtractModel: $("claudeExtractModel").value.trim(),
+    openaiApiUrl: $("openaiApiUrl").value.trim() || DEFAULTS.openaiApiUrl,
+    openaiApiKey: $("openaiApiKey").value.trim(),
+    openaiModel: $("openaiModel").value.trim() || DEFAULTS.openaiModel,
+    openaiExtractModel: $("openaiExtractModel").value.trim(),
+    ollamaUrl: $("ollamaUrl").value.trim() || DEFAULTS.ollamaUrl,
+    ollamaModel: $("ollamaModel").value.trim() || DEFAULTS.ollamaModel,
+    ollamaExtractModel: $("ollamaExtractModel").value.trim(),
+    confidenceThreshold: parseFloat($("confidenceThreshold").value),
+    hybridMode: $("hybridMode").checked,
+    folderName: $("folderName").value.trim() || DEFAULTS.folderName,
     folderMode: (document.querySelector('input[name="folderMode"]:checked') || {}).value || "perAccount",
-    unifiedAccountId: document.getElementById("unifiedAccount").value || "",
+    unifiedAccountId: $("unifiedAccount").value || "",
     mailAction: (document.querySelector('input[name="mailAction"]:checked') || {}).value || "move",
-    autoMove: document.getElementById("autoMove").checked,
-    showNotification: document.getElementById("showNotification").checked,
-    notifyOnly: document.getElementById("notifyOnly").checked,
-    monitoredAccounts: monitored,
+    allowLocalFoldersFallback: $("allowLocalFoldersFallback").checked,
+    autoMove: $("autoMove").checked,
+    showNotification: $("showNotification").checked,
+    notifyOnly: $("notifyOnly").checked,
+    monitorMode: allChecked ? "all" : "selected",
+    monitoredAccounts: allChecked ? [] : checks.filter((cb) => cb.checked).map((cb) => cb.value),
+  };
+  const sagaData = {
+    exportSubdirectory: $("sagaExportSubdir").value.trim(),
+    autoExtractPDFs: $("sagaAutoExtract").checked,
+    cloudConsent: $("sagaCloudConsent").checked,
+    anafLookup: $("sagaAnafLookup").checked,
+    skipDomesticSuppliers: $("sagaSkipDomestic").checked,
   };
 
-  await browser.runtime.sendMessage({ type: "saveSettings", data });
-
-  // Save SAGA settings
-  const sagaSettings = {
-    exportSubdirectory: document.getElementById("sagaExportSubdir").value.trim() || "SAGA-Import",
-    autoExtractPDFs: document.getElementById("sagaAutoExtract").checked,
-  };
-  await browser.runtime.sendMessage({ type: "sagaSaveSettings", data: sagaSettings });
-
-  const status = document.getElementById("saveStatus");
-  status.textContent = "Settings saved!";
-  setTimeout(() => { status.textContent = ""; }, 3000);
+  const [r1, r2] = await Promise.all([send("saveSettings", { data }), send("sagaSaveSettings", { data: sagaData })]);
+  if (!r1.success || !r2.success) {
+    flash(status, t("saveFailed", [(r1.error || r2.error || "").toString()]), true);
+    return;
+  }
+  currentSettings = await send("getSettings");
+  await loadSagaSettings();
+  updateSagaWarnings();
+  flash(status, t("saved") + permissionNote, Boolean(permissionNote), permissionNote ? 12000 : 3000);
 }
 
-// ============================================================
-//  Test backend connection
-// ============================================================
-
-async function testBackend(backend, options) {
-  const btn = document.getElementById("test" + backend.charAt(0).toUpperCase() + backend.slice(1));
-  const origText = btn.textContent;
-  btn.textContent = "Testing...";
-  btn.disabled = true;
-
-  try {
-    const result = await browser.runtime.sendMessage({ type: "testBackend", backend, options });
-    if (result.success) {
-      btn.textContent = "OK!";
-      btn.style.background = "#dcfce7";
-    } else {
-      btn.textContent = "Failed";
-      btn.style.background = "#fee2e2";
-      alert("Connection test failed:\n" + (result.error || "Unknown error"));
-    }
-  } catch (err) {
-    btn.textContent = "Error";
-    btn.style.background = "#fee2e2";
-    alert("Test error: " + err.message);
-  }
-
+async function testBackend(backend) {
+  const button = $(`test${backend.charAt(0).toUpperCase()}${backend.slice(1)}`);
+  const original = button.textContent;
+  const options =
+    backend === "ollama"
+      ? { url: $("ollamaUrl").value, model: $("ollamaModel").value }
+      : { apiKey: $(`${backend}ApiKey`).value, apiUrl: $(`${backend}ApiUrl`).value, model: $(`${backend}Model`).value };
+  button.textContent = t("testing");
+  button.disabled = true;
+  const result = await send("testBackend", { backend, options }).catch((err) => ({ success: false, error: err.message }));
+  button.textContent = result.success ? t("testOk") : t("testFailed");
+  button.classList.toggle("btn-ok", Boolean(result.success));
+  button.classList.toggle("btn-fail", !result.success);
+  if (!result.success) alert(t("testFailedDetail", [result.error || "?"]));
   setTimeout(() => {
-    btn.textContent = origText;
-    btn.disabled = false;
-    btn.style.background = "";
+    button.textContent = original;
+    button.disabled = false;
+    button.classList.remove("btn-ok", "btn-fail");
   }, 3000);
 }
 
+async function loadBackendStatus() {
+  const status = await send("getBackendStatus");
+  const banner = $("backendBanner");
+  if (status && status.ok === false) {
+    banner.textContent = t("bannerBackendFailing", [backendLabel(status.backend), status.error || ""]);
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+}
+
+function updateSagaWarnings() {
+  const box = $("sagaBackendWarning");
+  const backend = currentSettings && currentSettings.aiBackend;
+  let text = "";
+  if (companies.length > 0 && backend === "keywords") text = t("warnSagaNeedsAi");
+  else if (companies.length > 0 && (backend === "claude" || backend === "openai") && !(currentSagaSettings && currentSagaSettings.cloudConsent)) text = t("warnSagaConsent");
+  box.textContent = text;
+  box.hidden = !text;
+}
+
 // ============================================================
-//  Scan existing emails
+//  Events
 // ============================================================
 
-async function startScan() {
-  const btn = document.getElementById("btnScan");
-  const progressEl = document.getElementById("scanProgress");
-  const fillEl = document.getElementById("scanFill");
-  const statusEl = document.getElementById("scanStatus");
+function bindEvents() {
+  $("confidenceThreshold").addEventListener("input", () => {
+    $("thresholdValue").textContent = Number($("confidenceThreshold").value).toFixed(2);
+  });
+  const updateUnified = () => {
+    $("unifiedAccountGroup").hidden = document.querySelector('input[name="folderMode"]:checked').value !== "unified";
+  };
+  document.querySelectorAll('input[name="folderMode"]').forEach((radio) => radio.addEventListener("change", updateUnified));
+  updateUnified();
 
-  const accountId = document.getElementById("scanAccount").value || undefined;
-  const fromDate = document.getElementById("scanFrom").value || undefined;
-  const toDate = document.getElementById("scanTo").value || undefined;
-
-  btn.disabled = true;
-  btn.textContent = "Scanning...";
-  progressEl.hidden = false;
-  fillEl.style.width = "0%";
-  statusEl.textContent = "Starting scan...";
-
-  try {
-    const result = await browser.runtime.sendMessage({
-      type: "scanExisting",
-      accountId,
-      fromDate,
-      toDate,
+  $("btnSave").addEventListener("click", saveSettings);
+  for (const backend of ["claude", "openai", "ollama"]) {
+    $(`test${backend.charAt(0).toUpperCase()}${backend.slice(1)}`).addEventListener("click", (e) => {
+      e.preventDefault();
+      testBackend(backend);
     });
-
-    fillEl.style.width = "100%";
-    statusEl.textContent = `Done! Scanned ${result.total} emails, found ${result.found} invoices.`;
-    await loadHistory();
-  } catch (err) {
-    statusEl.textContent = "Scan failed: " + err.message;
   }
 
-  btn.disabled = false;
-  btn.textContent = "Scan Now";
+  $("sortDate").addEventListener("click", () => {
+    historySortDesc = !historySortDesc;
+    $("sortDate").textContent = `${t("colDate")} ${historySortDesc ? "▼" : "▲"}`;
+    sortAndRender();
+  });
+  $("btnLoadMore").addEventListener("click", renderHistoryPage);
+  $("btnExportCSV").addEventListener("click", exportCSV);
+  $("btnClearHistory").addEventListener("click", async () => {
+    if (!confirm(t("confirmClearHistory"))) return;
+    await send("clearHistory");
+    await loadHistory();
+  });
+
+  $("btnScan").addEventListener("click", startScan);
+  $("btnCancelScan").addEventListener("click", () => send("cancelScan"));
+  $("btnResetProcessed").addEventListener("click", async () => {
+    if (!confirm(t("confirmResetProcessed"))) return;
+    const result = await send("resetProcessed");
+    flash($("scanStatus"), result.success ? t("resetProcessedDone") : result.error, !result.success);
+    $("scanProgress").hidden = false;
+  });
 }
 
 // ============================================================
-//  Export CSV
-// ============================================================
-
-async function exportCSV() {
-  const csv = await browser.runtime.sendMessage({ type: "exportCSV" });
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `incobills-history-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ============================================================
-//  Helpers
+//  Scan
 // ============================================================
 
 function setDefaultScanDates() {
   const now = new Date();
-  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  document.getElementById("scanFrom").value = firstOfMonth.toISOString().slice(0, 10);
-  document.getElementById("scanTo").value = now.toISOString().slice(0, 10);
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  $("scanFrom").value = iso(first);
+  $("scanTo").value = iso(now);
 }
 
-function extractSenderName(from) {
-  const match = from.match(/^"?([^"<]+)"?\s*</);
-  return match ? match[1].trim() : from.split("@")[0] || from;
+function connectScanPort() {
+  const port = browser.runtime.connect({ name: "scan" });
+  port.onMessage.addListener((message) => {
+    if (message && message.type === "progress") renderScanState(message.state);
+  });
+}
+
+function renderScanState(state) {
+  if (!state || (!state.running && !state.finishedAt)) return;
+  $("scanProgress").hidden = false;
+  $("btnScan").disabled = state.running;
+  $("btnCancelScan").hidden = !state.running;
+  const percent = state.total ? Math.round((state.processed / state.total) * 100) : state.running ? 0 : 100;
+  $("scanFill").style.width = `${percent}%`;
+  let text;
+  if (state.running) text = state.total ? t("scanProgress", [state.processed, state.total, state.found]) : t("scanPreparing");
+  else if (state.error) text = t("scanFailed", [state.error]);
+  else if (state.cancelled) text = t("scanCancelled", [state.processed, state.total, state.found]);
+  else text = t("scanDone", [state.processed, state.total, state.found]);
+  $("scanStatus").textContent = text;
+  $("scanStatus").classList.toggle("is-error", Boolean(state.error));
+  if (!state.running && state.finishedAt && state.finishedAt !== lastScanFinishedAt) {
+    lastScanFinishedAt = state.finishedAt;
+    loadHistory();
+    loadSagaQueue();
+    loadBackendStatus();
+  }
+}
+
+async function startScan() {
+  const params = {
+    accountId: $("scanAccount").value || undefined,
+    fromDate: $("scanFrom").value || undefined,
+    toDate: $("scanTo").value || undefined,
+  };
+  $("scanProgress").hidden = false;
+  $("scanStatus").textContent = t("scanCounting");
+  $("btnScan").disabled = true;
+  const result = await send("estimateScan", { params });
+  $("btnScan").disabled = false;
+  if (!result.success) {
+    flash($("scanStatus"), t("scanFailed", [result.error]), true, 0);
+    return;
+  }
+  const est = result.estimate;
+  if (est.pending === 0) {
+    $("scanStatus").textContent = t("scanNothing", [est.total]);
+    return;
+  }
+  const question =
+    est.backend === "keywords"
+      ? t("scanConfirmLocal", [est.pending, est.total])
+      : t("scanConfirmAi", [est.pending, est.total, backendLabel(est.backend), est.approxInputTokens.toLocaleString(), est.hybrid ? t("scanHybridNote") : ""]);
+  if (!confirm(question)) {
+    $("scanStatus").textContent = "";
+    return;
+  }
+  const started = await send("startScan", { params });
+  if (!started.success) flash($("scanStatus"), t("scanFailed", [started.error]), true, 0);
 }
 
 // ============================================================
-//  SAGA Export — Company Registry
+//  History
+// ============================================================
+
+async function loadHistory() {
+  allHistory = await send("getHistory");
+  sortAndRender();
+}
+
+function sortAndRender() {
+  allHistory.sort((a, b) => (historySortDesc ? -1 : 1) * String(a.timestamp || "").localeCompare(String(b.timestamp || "")));
+  historyOffset = 0;
+  renderHistoryPage();
+}
+
+function actionLabel(action) {
+  const label = t(`action_${action}`);
+  return label === `action_${action}` ? action : label;
+}
+
+function renderHistoryPage() {
+  const tbody = $("historyBody");
+  const page = allHistory.slice(0, historyOffset + HISTORY_PAGE_SIZE);
+  clear(tbody);
+  if (page.length === 0) {
+    tbody.appendChild(el("tr", {}, el("td", { colSpan: 6, className: "empty-cell", text: t("noHistory") })));
+    $("btnLoadMore").hidden = true;
+    return;
+  }
+  for (const entry of page) {
+    const date = new Date(entry.timestamp);
+    const dateStr = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const c = entry.classification || {};
+    const confidence = Number.isFinite(c.confidence) ? `${Math.round(c.confidence * 100)}%` : "-";
+    const source = c.source || entry.backend || "-";
+    const action = entry.action || "skipped";
+    const actionText = actionLabel(action) + (entry.userOverride ? ` (${t(entry.userOverride === "invoice" ? "overrideInvoice" : "overrideNotInvoice")})` : "");
+    tbody.appendChild(
+      el("tr", {}, [
+        el("td", { title: entry.timestamp, text: dateStr }),
+        el("td", { title: entry.from || "", text: senderName(entry.from || "") }),
+        el("td", { title: entry.subject || "", text: entry.subject || t("noSubject") }),
+        el("td", { title: c.reason || "", text: confidence }),
+        el("td", { text: c.fallback ? `${source} ⚠` : source, title: c.fallback ? c.reason : "" }),
+        el("td", { className: `action-${action}`, title: entry.error || "", text: actionText }),
+      ])
+    );
+  }
+  historyOffset = page.length;
+  $("btnLoadMore").hidden = historyOffset >= allHistory.length;
+}
+
+async function exportCSV() {
+  const csv = await send("exportCSV");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = el("a", { href: url, download: `incobills-history-${new Date().toISOString().slice(0, 10)}.csv` });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// ============================================================
+//  Sender rules
+// ============================================================
+
+async function loadRules() {
+  const rules = await send("getSenderRules");
+  const list = $("rulesList");
+  clear(list);
+  const entries = Object.entries(rules || {}).sort((a, b) => String(b[1].createdAt || "").localeCompare(String(a[1].createdAt || "")));
+  if (entries.length === 0) {
+    list.appendChild(el("div", { className: "loading", text: t("noRules") }));
+    return;
+  }
+  for (const [key, rule] of entries) {
+    const remove = el("button", { className: "btn btn-sm btn-danger", text: t("btnDelete") });
+    remove.addEventListener("click", async () => {
+      await send("removeSenderRule", { key });
+      await loadRules();
+    });
+    list.appendChild(
+      el("div", { className: "rule-item" }, [
+        el("span", { className: "rule-sender", text: key.replace(/^(addr|domain):/, "") }),
+        el("span", { className: `badge ${rule.verdict === "invoice" ? "badge-free" : "badge-danger"}`, text: t(rule.verdict === "invoice" ? "ruleInvoice" : "ruleNotInvoice") }),
+        remove,
+      ])
+    );
+  }
+}
+
+// ============================================================
+//  SAGA — companies
 // ============================================================
 
 async function loadSagaCompanies() {
-  const companies = await browser.runtime.sendMessage({ type: "sagaGetCompanies" });
-  renderSagaCompanies(companies || []);
-}
-
-function renderSagaCompanies(companies) {
-  const listEl = document.getElementById("sagaCompaniesList");
-  while (listEl.lastChild) {
-    listEl.removeChild(listEl.lastChild);
-  }
-
+  companies = (await send("sagaGetCompanies")) || [];
+  const listEl = $("sagaCompaniesList");
+  clear(listEl);
   if (companies.length === 0) {
-    const emptyDiv = document.createElement("div");
-    emptyDiv.className = "loading";
-    emptyDiv.textContent = "Nicio firmă configurată. Adaugă cel puțin o firmă pentru a activa exportul SAGA.";
-    listEl.appendChild(emptyDiv);
-    return;
+    listEl.appendChild(el("div", { className: "loading", text: t("noCompanies") }));
   }
-
-  for (const comp of companies) {
-    const div = document.createElement("div");
-    div.className = "saga-company-item";
-    div.dataset.id = comp.id;
-
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "saga-company-info";
-
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "saga-company-name";
-    nameDiv.textContent = comp.name;
-
-    const cifDiv = document.createElement("div");
-    cifDiv.className = "saga-company-cif";
-    cifDiv.textContent = `CIF: ${comp.cif} | Județ: ${comp.county}`;
-
-    infoDiv.appendChild(nameDiv);
-    infoDiv.appendChild(cifDiv);
-
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "saga-company-actions";
-
-    const editBtn = document.createElement("button");
-    editBtn.className = "btn btn-sm";
-    editBtn.textContent = "Editează";
-    editBtn.addEventListener("click", () => editSagaCompany(comp));
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn btn-sm btn-danger";
-    delBtn.textContent = "Șterge";
-    delBtn.addEventListener("click", () => deleteSagaCompany(comp.id));
-
-    actionsDiv.appendChild(editBtn);
-    actionsDiv.appendChild(delBtn);
-
-    div.appendChild(infoDiv);
-    div.appendChild(actionsDiv);
-    listEl.appendChild(div);
+  for (const company of companies) {
+    const edit = el("button", { className: "btn btn-sm", text: t("btnEdit") });
+    edit.addEventListener("click", () => showCompanyForm(company));
+    const del = el("button", { className: "btn btn-sm btn-danger", text: t("btnDelete") });
+    del.addEventListener("click", () => deleteSagaCompany(company.id));
+    listEl.appendChild(
+      el("div", { className: "saga-company-item" }, [
+        el("div", { className: "saga-company-info" }, [
+          el("div", { className: "saga-company-name", text: company.name }),
+          el("div", { className: "saga-company-cif", text: `CIF: ${company.cif}${company.county ? ` | ${t("fldCountyShort")}: ${company.county}` : ""}` }),
+        ]),
+        el("div", { className: "saga-company-actions" }, [edit, del]),
+      ])
+    );
   }
+  updateSagaWarnings();
 }
+
+const COMPANY_FIELDS = {
+  sagaCompName: "name",
+  sagaCompCif: "cif",
+  sagaCompRegCom: "regCom",
+  sagaCompCapital: "capital",
+  sagaCompCountry: "country",
+  sagaCompCounty: "county",
+  sagaCompCity: "city",
+  sagaCompAddress: "address",
+  sagaCompBank: "bank",
+  sagaCompIban: "iban",
+  sagaCompPhone: "phone",
+  sagaCompEmail: "email",
+};
 
 function showCompanyForm(company) {
-  const form = document.getElementById("sagaCompanyForm");
-  const title = document.getElementById("sagaFormTitle");
-
-  if (company) {
-    title.textContent = "Editează Firmă";
-    document.getElementById("sagaCompanyId").value = company.id;
-    document.getElementById("sagaCompName").value = company.name;
-    document.getElementById("sagaCompCif").value = company.cif;
-    document.getElementById("sagaCompRegCom").value = company.regCom;
-    document.getElementById("sagaCompCapital").value = company.capital;
-    document.getElementById("sagaCompCountry").value = company.country;
-    document.getElementById("sagaCompCounty").value = company.county;
-    document.getElementById("sagaCompCity").value = company.city;
-    document.getElementById("sagaCompAddress").value = company.address;
-    document.getElementById("sagaCompBank").value = company.bank;
-    document.getElementById("sagaCompIban").value = company.iban;
-    document.getElementById("sagaCompPhone").value = company.phone;
-    document.getElementById("sagaCompEmail").value = company.email;
-  } else {
-    title.textContent = "Adaugă Firmă";
-    document.getElementById("sagaCompanyId").value = "";
-    form.querySelectorAll("input[type=text], input[type=email], input[type=hidden]").forEach((input) => {
-      if (input.id !== "sagaCompCountry") input.value = "";
-    });
-    document.getElementById("sagaCompCountry").value = "RO";
-    document.getElementById("sagaCompCounty").value = "B";
+  $("sagaFormTitle").textContent = t(company ? "titleEditCompany" : "titleAddCompany");
+  $("sagaCompanyId").value = company ? company.id : "";
+  for (const [id, key] of Object.entries(COMPANY_FIELDS)) {
+    $(id).value = company ? company[key] || "" : key === "country" ? "RO" : key === "county" ? "B" : "";
   }
-
-  form.hidden = false;
+  $("sagaCompanyError").hidden = true;
+  $("sagaCompanyForm").hidden = false;
+  $("sagaCompCif").focus();
 }
 
 function hideCompanyForm() {
-  document.getElementById("sagaCompanyForm").hidden = true;
+  $("sagaCompanyForm").hidden = true;
 }
 
 async function saveSagaCompany() {
-  const id = document.getElementById("sagaCompanyId").value;
-  const data = {
-    name: document.getElementById("sagaCompName").value.trim(),
-    cif: document.getElementById("sagaCompCif").value.trim(),
-    regCom: document.getElementById("sagaCompRegCom").value.trim(),
-    capital: document.getElementById("sagaCompCapital").value.trim(),
-    country: document.getElementById("sagaCompCountry").value.trim(),
-    county: document.getElementById("sagaCompCounty").value,
-    city: document.getElementById("sagaCompCity").value.trim(),
-    address: document.getElementById("sagaCompAddress").value.trim(),
-    bank: document.getElementById("sagaCompBank").value.trim(),
-    iban: document.getElementById("sagaCompIban").value.trim(),
-    phone: document.getElementById("sagaCompPhone").value.trim(),
-    email: document.getElementById("sagaCompEmail").value.trim(),
-  };
-
-  // Basic validation
-  const required = ["name", "cif", "regCom", "capital", "city", "address", "bank", "iban", "phone", "email"];
-  for (const field of required) {
-    if (!data[field]) {
-      alert(`Câmpul obligatoriu lipsă: ${field}`);
-      return;
-    }
+  const id = $("sagaCompanyId").value;
+  const data = {};
+  for (const [field, key] of Object.entries(COMPANY_FIELDS)) data[key] = $(field).value.trim();
+  const result = id ? await send("sagaUpdateCompany", { id, data }) : await send("sagaAddCompany", { data });
+  if (!result || !result.success) {
+    const box = $("sagaCompanyError");
+    box.textContent = (result && result.error) || t("saveFailed", [""]);
+    box.hidden = false;
+    return;
   }
-
-  try {
-    if (id) {
-      await browser.runtime.sendMessage({ type: "sagaUpdateCompany", id, data });
-    } else {
-      await browser.runtime.sendMessage({ type: "sagaAddCompany", data });
-    }
-    hideCompanyForm();
-    await loadSagaCompanies();
-    await loadSagaQueue();
-  } catch (err) {
-    alert("Eroare la salvare: " + err.message);
-  }
+  hideCompanyForm();
+  await loadSagaCompanies();
 }
 
-async function editSagaCompany(company) {
-  showCompanyForm(company);
+async function anafFill() {
+  const button = $("btnAnafFill");
+  const cif = $("sagaCompCif").value.trim();
+  if (!cif) return;
+  button.disabled = true;
+  const result = await send("sagaAnafLookup", { cif });
+  button.disabled = false;
+  const box = $("sagaCompanyError");
+  if (!result.success) {
+    box.textContent = result.error || t("errAnafNotFound");
+    box.hidden = false;
+    return;
+  }
+  box.hidden = true;
+  const info = result.info;
+  $("sagaCompCif").value = info.vatPayer ? `RO${info.cui}` : info.cui;
+  if (info.name) $("sagaCompName").value = info.name;
+  if (info.regCom) $("sagaCompRegCom").value = info.regCom;
+  if (info.address) $("sagaCompAddress").value = info.address;
+  if (info.city) $("sagaCompCity").value = info.city;
+  if (info.county && [...$("sagaCompCounty").options].some((o) => o.value === info.county)) $("sagaCompCounty").value = info.county;
+  if (info.phone && !$("sagaCompPhone").value) $("sagaCompPhone").value = info.phone;
+  if (info.iban && !$("sagaCompIban").value) $("sagaCompIban").value = info.iban;
+  $("sagaCompCountry").value = "RO";
 }
 
 async function deleteSagaCompany(id) {
-  if (!confirm("Sigur dorești să ștergi această firmă?")) return;
-  try {
-    await browser.runtime.sendMessage({ type: "sagaDeleteCompany", id });
-    await loadSagaCompanies();
-  } catch (err) {
-    alert("Eroare la ștergere: " + err.message);
-  }
+  if (!confirm(t("confirmDeleteCompany"))) return;
+  const result = await send("sagaDeleteCompany", { id });
+  if (!result.success && result.error) alert(result.error);
+  await loadSagaCompanies();
 }
 
 // ============================================================
-//  SAGA Export — Queue
+//  SAGA — queue
 // ============================================================
+
+function isExportable(item) {
+  return (item.status === "extracted" || item.status === "reviewed") && !item.needsReview && item.direction !== "unknown" && Boolean(item.companyId) && Boolean(item.data);
+}
+
+function statusLabel(item) {
+  if (item.status === "extracted") return isExportable(item) ? t("statusReady") : t("statusNeedsReview");
+  return t(`status_${item.status}`);
+}
+
+function directionLabel(direction) {
+  return t(direction === "intrari" ? "dirIntrari" : direction === "iesiri" ? "dirIesiri" : "dirUnknown");
+}
+
+function formatAmount(value, currency) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n.toFixed(2)} ${currency || "RON"}` : "";
+}
 
 async function loadSagaQueue() {
-  const queue = await browser.runtime.sendMessage({ type: "sagaGetQueue" });
-  renderSagaQueue(queue || []);
-}
-
-function renderSagaQueue(queue) {
-  const listEl = document.getElementById("sagaQueueList");
-  const countEl = document.getElementById("sagaQueueCount");
-
-  while (listEl.lastChild) {
-    listEl.removeChild(listEl.lastChild);
-  }
-
-  const pending = queue.filter((q) => q.status !== "exported");
-  countEl.textContent = pending.length;
-
+  queue = (await send("sagaGetQueue")) || [];
+  const listEl = $("sagaQueueList");
+  clear(listEl);
+  const open = queue.filter((q) => q.status === "extracted" || q.status === "reviewed");
+  $("sagaQueueCount").textContent = String(open.length);
   if (queue.length === 0) {
-    const emptyDiv = document.createElement("div");
-    emptyDiv.className = "loading";
-    emptyDiv.textContent = "Nicio factură în coadă.";
-    listEl.appendChild(emptyDiv);
+    listEl.appendChild(el("div", { className: "loading", text: t("queueEmpty") }));
     return;
   }
+  for (const item of queue) listEl.appendChild(renderQueueItem(item));
+}
 
-  for (const item of queue) {
-    const div = document.createElement("div");
-    div.className = `saga-queue-item saga-status-${item.status}`;
+function renderQueueItem(item) {
+  const d = item.data || {};
+  const partner = item.direction === "iesiri" ? d.clientNume : d.furnizorNume;
+  const title = item.data ? `${d.facturaNumar || t("unknown")} — ${partner || ""}` : item.subject || t("unknown");
+  const meta = item.data
+    ? [d.facturaData, directionLabel(item.direction), formatAmount(d.totalCuTVA, d.moneda), statusLabel(item)].filter(Boolean).join(" | ")
+    : [senderName(item.from), statusLabel(item)].filter(Boolean).join(" | ");
 
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "saga-queue-info";
-
-    const numarDiv = document.createElement("div");
-    numarDiv.className = "saga-queue-numar";
-    numarDiv.textContent = item.rawData?.facturaNumar || "Necunoscut";
-
-    const metaDiv = document.createElement("div");
-    metaDiv.className = "saga-queue-meta";
-    const dirText = item.direction === "intrari" ? "Intrări" : item.direction === "iesiri" ? "Ieșiri" : "Necunoscut";
-    const statusText = item.status === "extracted" ? "Nou" : item.status === "reviewed" ? "Verificat" : item.status === "exported" ? "Exportat" : "Eroare";
-    metaDiv.textContent = `${item.rawData?.furnizorNume || ""} | ${item.rawData?.facturaData || ""} | ${dirText} | ${statusText}`;
-
-    if (item.needsReview) {
-      const reviewBadge = document.createElement("span");
-      reviewBadge.className = "badge badge-danger";
-      reviewBadge.textContent = "Necesită Review";
-      metaDiv.appendChild(document.createTextNode(" "));
-      metaDiv.appendChild(reviewBadge);
-    }
-
-    infoDiv.appendChild(numarDiv);
-    infoDiv.appendChild(metaDiv);
-
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "saga-queue-actions";
-
-    if (item.status !== "exported") {
-      const exportBtn = document.createElement("button");
-      exportBtn.className = "btn btn-sm btn-primary";
-      exportBtn.textContent = "Exportă XML";
-      exportBtn.addEventListener("click", () => exportSagaItems([item.id]));
-      actionsDiv.appendChild(exportBtn);
-    }
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn btn-sm btn-danger";
-    delBtn.textContent = "Șterge";
-    delBtn.addEventListener("click", () => removeSagaQueueItem(item.id));
-    actionsDiv.appendChild(delBtn);
-
-    div.appendChild(infoDiv);
-    div.appendChild(actionsDiv);
-    listEl.appendChild(div);
+  const info = el("div", { className: "saga-queue-info" }, [
+    el("div", { className: "saga-queue-numar" }, [title, item.source ? el("span", { className: "badge badge-source", text: item.source === "efactura" ? "e-Factura" : "PDF" }) : null]),
+    el("div", { className: "saga-queue-meta", text: meta }),
+  ]);
+  if (item.validation && (item.validation.errors.length || item.validation.warnings.length) && item.status !== "exported") {
+    info.appendChild(
+      el("div", { className: "saga-queue-validation" }, [
+        item.validation.errors.length ? el("span", { className: "val-error", text: t("valErrorsCount", [item.validation.errors.length]) }) : null,
+        item.validation.warnings.length ? el("span", { className: "val-warn", text: t("valWarningsCount", [item.validation.warnings.length]) }) : null,
+      ])
+    );
   }
+  if (item.error) info.appendChild(el("div", { className: "saga-queue-error", text: tMsg(item.error) }));
+  if (item.filename) info.appendChild(el("div", { className: "saga-queue-meta", text: item.filename }));
+
+  const actions = el("div", { className: "saga-queue-actions" });
+  if ((item.status === "extracted" || item.status === "reviewed") && item.data) {
+    actions.appendChild(el("button", { className: "btn btn-sm", text: t("btnReview"), onclick: () => openReview(item) }));
+    if (isExportable(item)) actions.appendChild(el("button", { className: "btn btn-sm btn-primary", text: t("btnExportXml"), onclick: () => exportSagaItems([item.id]) }));
+  }
+  if ((item.status === "failed" || item.status === "nonInvoice") && item.headerMessageId) {
+    actions.appendChild(el("button", { className: "btn btn-sm", text: t("btnRetry"), onclick: () => retrySagaItem(item.id) }));
+  }
+  actions.appendChild(el("button", { className: "btn btn-sm btn-danger", text: t("btnDelete"), onclick: () => removeSagaQueueItem(item.id) }));
+
+  return el("div", { className: `saga-queue-item saga-status-${item.status}${item.needsReview ? " needs-review" : ""}` }, [info, actions]);
+}
+
+function reportExport(result) {
+  const status = $("sagaQueueStatus");
+  if (!result.success) {
+    flash(status, result.error || t("exportFailed"), true, 0);
+    return;
+  }
+  const ok = result.results.filter((r) => r.success).length;
+  const failed = result.results.filter((r) => !r.success);
+  if (result.results.length === 0) flash(status, t("exportNothing"));
+  else flash(status, failed.length ? t("exportPartial", [ok, failed.length, failed[0].error]) : t("exportDone", [ok]), failed.length > 0, 10000);
 }
 
 async function exportSagaItems(itemIds) {
-  if (!itemIds || itemIds.length === 0) {
-    alert("Selectează cel puțin o factură pentru export.");
-    return;
-  }
-  try {
-    const results = await browser.runtime.sendMessage({ type: "sagaExportItems", itemIds });
-    const success = results.filter((r) => r.success).length;
-    const failed = results.filter((r) => !r.success).length;
+  reportExport(await send("sagaExportItems", { itemIds }));
+  await loadSagaQueue();
+}
 
-    if (failed > 0) {
-      alert(`Export completat: ${success} succes, ${failed} eșuat.`);
-    } else {
-      alert(`Export completat: ${success} fișier(e) salvat(e).`);
-    }
-    await loadSagaQueue();
-  } catch (err) {
-    alert("Eroare la export: " + err.message);
-  }
+async function retrySagaItem(id) {
+  flash($("sagaQueueStatus"), t("retrying"), false, 0);
+  const result = await send("sagaRetryQueueItem", { id });
+  flash($("sagaQueueStatus"), result.success ? t("retryDone", [result.added]) : result.error, !result.success);
+  await loadSagaQueue();
 }
 
 async function removeSagaQueueItem(id) {
-  if (!confirm("Sigur dorești să elimini această factură din coadă?")) return;
-  try {
-    await browser.runtime.sendMessage({ type: "sagaRemoveQueueItem", id });
-    await loadSagaQueue();
-  } catch (err) {
-    alert("Eroare: " + err.message);
-  }
+  if (!confirm(t("confirmRemoveQueueItem"))) return;
+  await send("sagaRemoveQueueItem", { id });
+  await loadSagaQueue();
 }
-
-async function clearSagaQueue() {
-  if (!confirm("Sigur dorești să golești toată coada? Facturile exportate vor rămâne.")) return;
-  try {
-    await browser.runtime.sendMessage({ type: "sagaClearQueue" });
-    await loadSagaQueue();
-  } catch (err) {
-    alert("Eroare: " + err.message);
-  }
-}
-
-// ============================================================
-//  SAGA Export — Event Binding
-// ============================================================
 
 function bindSagaEvents() {
-  document.getElementById("btnAddCompany").addEventListener("click", () => showCompanyForm(null));
-  document.getElementById("btnSaveCompany").addEventListener("click", saveSagaCompany);
-  document.getElementById("btnCancelCompany").addEventListener("click", hideCompanyForm);
-  document.getElementById("btnSagaExportAll").addEventListener("click", async () => {
-    const queue = await browser.runtime.sendMessage({ type: "sagaGetQueue" });
-    const pending = queue.filter((q) => q.status !== "exported").map((q) => q.id);
-    exportSagaItems(pending);
+  $("btnAddCompany").addEventListener("click", () => showCompanyForm(null));
+  $("btnSaveCompany").addEventListener("click", saveSagaCompany);
+  $("btnCancelCompany").addEventListener("click", hideCompanyForm);
+  $("btnAnafFill").addEventListener("click", anafFill);
+  $("btnSagaExportAll").addEventListener("click", async () => {
+    reportExport(await send("sagaExportAll"));
+    await loadSagaQueue();
   });
-  document.getElementById("btnSagaClearQueue").addEventListener("click", clearSagaQueue);
+  $("btnSagaClearQueue").addEventListener("click", async () => {
+    if (!confirm(t("confirmClearQueue"))) return;
+    await send("sagaClearQueue");
+    await loadSagaQueue();
+  });
 }
 
 // ============================================================
-//  Helpers
+//  SAGA — review dialog
 // ============================================================
 
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+const PARTY_FIELDS = ["Nume", "Cif", "RegCom", "Adresa", "Localitate", "Judet", "Tara", "IBAN", "Banca", "Telefon", "Mail"];
+const NUMBER_FIELDS = ["totalFaraTVA", "totalTVA", "totalCuTVA"];
+
+function field(label, input) {
+  return el("label", { className: "review-field" }, [el("span", { text: label }), input]);
+}
+
+function textInput(key, value, type = "text") {
+  const input = el("input", { type, dataset: { key } });
+  input.value = value == null ? "" : String(value);
+  if (NUMBER_FIELDS.includes(key)) input.inputMode = "decimal";
+  return input;
+}
+
+function openReview(item) {
+  currentReview = structuredClone(item);
+  const d = currentReview.data;
+  $("reviewSource").textContent = [item.source === "efactura" ? "e-Factura" : "PDF", item.subject, senderName(item.from)].filter(Boolean).join(" • ");
+  $("reviewStatus").textContent = "";
+
+  const header = $("reviewHeaderFields");
+  clear(header);
+  const direction = el("select", { id: "reviewDirection" }, ["intrari", "iesiri", "unknown"].map((v) => el("option", { value: v, text: directionLabel(v), selected: item.direction === v })));
+  const company = el("select", { id: "reviewCompany" }, [
+    el("option", { value: "", text: t("optAutoCompany") }),
+    ...companies.map((c) => el("option", { value: c.id, text: `${c.name} (${c.cif})`, selected: item.companyId === c.id })),
+  ]);
+  header.append(
+    field(t("fldDirection"), direction),
+    field(t("fldCompany"), company),
+    field(t("fldInvoiceNumber"), textInput("facturaNumar", d.facturaNumar)),
+    field(t("fldInvoiceDate"), textInput("facturaData", d.facturaData, "date")),
+    field(t("fldDueDate"), textInput("facturaScadenta", d.facturaScadenta, "date")),
+    field(t("fldCurrency"), textInput("moneda", d.moneda)),
+    field(t("fldTotalNet"), textInput("totalFaraTVA", d.totalFaraTVA)),
+    field(t("fldTotalVat"), textInput("totalTVA", d.totalTVA)),
+    field(t("fldTotalGross"), textInput("totalCuTVA", d.totalCuTVA)),
+    field(t("fldReverseCharge"), el("input", { type: "checkbox", dataset: { key: "taxareInversa" }, checked: Boolean(d.taxareInversa) })),
+    field(t("fldVatOnCollection"), el("input", { type: "checkbox", dataset: { key: "tvaIncasare" }, checked: Boolean(d.tvaIncasare) }))
+  );
+
+  for (const [prefix, containerId] of [["furnizor", "reviewSupplierFields"], ["client", "reviewClientFields"]]) {
+    const box = $(containerId);
+    clear(box);
+    for (const name of PARTY_FIELDS) box.appendChild(field(t(`fldParty${name}`), textInput(prefix + name, d[prefix + name])));
+  }
+
+  const tbody = $("reviewLines");
+  clear(tbody);
+  for (const line of d.linii || []) tbody.appendChild(lineRow(line));
+  renderValidation(item.validation);
+  $("reviewDialog").showModal();
+}
+
+function lineRow(line = {}) {
+  const cell = (key, numeric) => {
+    const input = el("input", { type: "text", dataset: { line: key } });
+    input.value = line[key] == null ? "" : String(line[key]);
+    if (numeric) input.inputMode = "decimal";
+    return el("td", {}, input);
+  };
+  const remove = el("button", { type: "button", className: "btn btn-sm btn-danger", text: "×", title: t("btnRemoveLine") });
+  const row = el("tr", {}, [cell("descriere"), cell("um"), cell("cantitate", true), cell("pret", true), cell("valoare", true), cell("procTVA", true), cell("tva", true), el("td", {}, remove)]);
+  remove.addEventListener("click", () => row.remove());
+  return row;
+}
+
+function parseLocalNumber(value) {
+  const s = String(value || "").trim().replace(/\s/g, "");
+  if (!s) return null;
+  const n = Number(s.includes(",") && !s.includes(".") ? s.replace(",", ".") : s.replace(/,/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function collectReview() {
+  const data = { ...currentReview.data };
+  for (const input of $("reviewForm").querySelectorAll("[data-key]")) {
+    data[input.dataset.key] = input.type === "checkbox" ? input.checked : input.value.trim();
+  }
+  data.linii = [...$("reviewLines").querySelectorAll("tr")].map((row) => {
+    const line = {};
+    for (const input of row.querySelectorAll("[data-line]")) line[input.dataset.line] = input.value.trim();
+    return line;
+  });
+  return { data, direction: $("reviewDirection").value, companyId: $("reviewCompany").value || null };
+}
+
+function renderValidation(validation) {
+  const box = $("reviewValidation");
+  clear(box);
+  if (!validation) return;
+  for (const e of validation.errors || []) box.appendChild(el("div", { className: "val-error", text: tMsg(e) }));
+  for (const w of validation.warnings || []) box.appendChild(el("div", { className: "val-warn", text: tMsg(w) }));
+  if (!(validation.errors || []).length && !(validation.warnings || []).length) box.appendChild(el("div", { className: "val-ok", text: t("valAllGood") }));
+}
+
+async function saveReview(markReviewed) {
+  const changes = collectReview();
+  const result = await send("sagaUpdateQueueItem", { id: currentReview.id, changes, markReviewed });
+  if (!result.success) {
+    flash($("reviewStatus"), result.error || t("saveFailed", [""]), true, 0);
+    return;
+  }
+  currentReview = structuredClone(result.item);
+  renderValidation(result.validation);
+  await loadSagaQueue();
+  if (markReviewed && result.reviewed) {
+    $("reviewDialog").close();
+    flash($("sagaQueueStatus"), t("reviewApproved"));
+  } else if (markReviewed) {
+    flash($("reviewStatus"), t("reviewHasErrors"), true, 0);
+  } else {
+    flash($("reviewStatus"), t("saved"));
+  }
+}
+
+function recalcTotals() {
+  let net = 0;
+  let vat = 0;
+  for (const row of $("reviewLines").querySelectorAll("tr")) {
+    net += parseLocalNumber(row.querySelector('[data-line="valoare"]').value) || 0;
+    vat += parseLocalNumber(row.querySelector('[data-line="tva"]').value) || 0;
+  }
+  const set = (key, value) => {
+    $("reviewForm").querySelector(`[data-key="${key}"]`).value = (Math.round(value * 100) / 100).toFixed(2);
+  };
+  set("totalFaraTVA", net);
+  set("totalTVA", vat);
+  set("totalCuTVA", net + vat);
+}
+
+function bindReview() {
+  $("btnAddLine").addEventListener("click", () => $("reviewLines").appendChild(lineRow({ um: "buc", cantitate: 1 })));
+  $("btnRecalcTotals").addEventListener("click", recalcTotals);
+  $("btnReviewCancel").addEventListener("click", () => $("reviewDialog").close());
+  $("btnReviewSave").addEventListener("click", () => saveReview(false));
+  $("btnReviewApprove").addEventListener("click", () => saveReview(true));
 }

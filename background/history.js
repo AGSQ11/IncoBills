@@ -1,49 +1,119 @@
 /**
- * IncoBills — AI-Powered Invoice Detection for Thunderbird
- * https://github.com/serverspan/incobills
+ * IncoBills — classification history and the "already processed" set.
  *
- * Classification History
- * Logs every classification decision for review, debugging, and CSV export.
+ * History is for display (capped, newest first). The processed set is keyed
+ * by the Message-ID header, which stays the same when a message moves
+ * (the Thunderbird message id does not).
  *
- * @author    ServerSpan <https://www.serverspan.com>
- * @copyright 2026 ServerSpan
- * @license   MIT
- * @version   1.0.0
+ * @license MIT
  */
 
 const History = {
-  async log(entry) {
-    const settings = await Storage.getAll();
-    let history = settings.classificationHistory || [];
+  _processed: null, // Map<key, timestamp>
+  _legacyIds: null, // Set of Thunderbird ids from 1.0/1.1 history entries (no Message-ID stored)
+  _dirty: false,
+  _flushTimer: null,
 
-    history.unshift({
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-      ...entry,
-    });
+  // ---- Processed set ----
 
-    // Prune oldest entries beyond the cap
-    const max = settings.historyMaxEntries || 500;
-    if (history.length > max) {
-      history = history.slice(0, max);
+  processedKey(message) {
+    if (message && message.headerMessageId) return `h:${message.headerMessageId}`;
+    return message && message.id != null ? `i:${message.id}` : null;
+  },
+
+  async _loadProcessed() {
+    if (!this._processed) {
+      const stored = await Storage.getData(DATA_KEYS.PROCESSED, {});
+      this._processed = new Map(Object.entries(stored && typeof stored === "object" ? stored : {}));
     }
+    return this._processed;
+  },
 
-    await Storage.set({ classificationHistory: history });
-    return history[0];
+  async isProcessed(message) {
+    const key = this.processedKey(message);
+    const set = await this._loadProcessed();
+    if (key && set.has(key)) return true;
+    // Entries written by 1.0/1.1 only have the Thunderbird message id.
+    if (!this._legacyIds) {
+      const history = await this.getAll();
+      this._legacyIds = new Set(history.filter((e) => !e.headerMessageId && e.messageId != null).map((e) => e.messageId));
+    }
+    return Boolean(message && message.id != null && this._legacyIds.has(message.id));
+  },
+
+  async markProcessed(message) {
+    const key = this.processedKey(message);
+    if (!key) return;
+    const set = await this._loadProcessed();
+    set.delete(key);
+    set.set(key, Date.now());
+    while (set.size > PROCESSED_MAX_ENTRIES) set.delete(set.keys().next().value);
+    this._dirty = true;
+    this._scheduleFlush();
+  },
+
+  async unmarkProcessed(message) {
+    const key = this.processedKey(message);
+    const set = await this._loadProcessed();
+    if (key && set.delete(key)) {
+      this._dirty = true;
+      this._scheduleFlush();
+    }
+  },
+
+  _scheduleFlush() {
+    if (this._flushTimer) return;
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      this.flush().catch((err) => console.error("IncoBills: saving processed set failed", err));
+    }, 2000);
+    if (this._flushTimer && this._flushTimer.unref) this._flushTimer.unref(); // Node (tests) only
+  },
+
+  async flush() {
+    if (!this._dirty || !this._processed) return;
+    this._dirty = false;
+    await Storage.set({ [DATA_KEYS.PROCESSED]: Object.fromEntries(this._processed) });
+  },
+
+  async resetProcessed() {
+    this._processed = new Map();
+    this._legacyIds = new Set();
+    this._dirty = false;
+    await Storage.set({ [DATA_KEYS.PROCESSED]: {} });
+    await Storage.update(DATA_KEYS.HISTORY, (list) => list.map((e) => ({ ...e, messageId: null })), []);
+  },
+
+  // ---- History ----
+
+  async log(entry) {
+    const settings = await Storage.getSettings();
+    const max = settings.historyMaxEntries || DEFAULTS.historyMaxEntries;
+    const record = { id: crypto.randomUUID(), timestamp: new Date().toISOString(), ...entry };
+    await Storage.update(
+      DATA_KEYS.HISTORY,
+      (list) => {
+        const next = Array.isArray(list) ? list : [];
+        next.unshift(record);
+        return next.slice(0, max);
+      },
+      []
+    );
+    return record;
   },
 
   async getAll() {
-    return (await Storage.get("classificationHistory")) || [];
+    const list = await Storage.getData(DATA_KEYS.HISTORY, []);
+    return Array.isArray(list) ? list : [];
   },
 
   async getRecent(count) {
-    const all = await this.getAll();
-    return all.slice(0, count);
+    return (await this.getAll()).slice(0, count);
   },
 
-  async isProcessed(messageId) {
-    const history = await this.getAll();
-    return history.some((entry) => entry.messageId === messageId);
+  async findByHeaderId(headerMessageId) {
+    if (!headerMessageId) return null;
+    return (await this.getAll()).find((e) => e.headerMessageId === headerMessageId) || null;
   },
 
   async getStats() {
@@ -51,47 +121,52 @@ const History = {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
     let today = 0;
     let thisMonth = 0;
     let total = 0;
-
     for (const entry of history) {
-      if (entry.action === "moved") {
-        total++;
-        if (entry.timestamp >= monthStart) thisMonth++;
-        if (entry.timestamp >= todayStart) today++;
-      }
+      if (!DETECTED_ACTIONS.includes(entry.action) || entry.userOverride === "notInvoice") continue;
+      total++;
+      if (entry.timestamp >= monthStart) thisMonth++;
+      if (entry.timestamp >= todayStart) today++;
     }
-
     return { today, thisMonth, total };
   },
 
   async updateOverride(historyId, override) {
-    const history = await this.getAll();
-    const entry = history.find((e) => e.id === historyId);
-    if (entry) {
-      entry.userOverride = override;
-      await Storage.set({ classificationHistory: history });
-    }
+    await Storage.update(
+      DATA_KEYS.HISTORY,
+      (list) => list.map((e) => (e.id === historyId ? { ...e, userOverride: override } : e)),
+      []
+    );
   },
 
   async clear() {
-    await Storage.set({ classificationHistory: [] });
+    this._legacyIds = null;
+    await Storage.set({ [DATA_KEYS.HISTORY]: [] });
   },
 
+  /** CSV with a UTF-8 BOM (Excel), escaped fields, and formula-injection guard. */
   async exportCSV() {
     const history = await this.getAll();
-    const headers = ["Date", "From", "Subject", "Confidence", "Backend", "Action", "Reason"];
-    const rows = history.map((e) => [
-      e.timestamp,
-      `"${(e.from || "").replace(/"/g, '""')}"`,
-      `"${(e.subject || "").replace(/"/g, '""')}"`,
-      e.classification ? e.classification.confidence : "",
-      e.backend || "",
-      e.action || "",
-      e.classification ? `"${(e.classification.reason || "").replace(/"/g, '""')}"` : "",
-    ]);
-    return [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const cell = (value) => {
+      let s = String(value ?? "");
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const headers = ["Date", "From", "Subject", "Confidence", "Source", "Action", "Override", "Reason"];
+    const rows = history.map((e) =>
+      [
+        e.timestamp,
+        e.from,
+        e.subject,
+        e.classification ? e.classification.confidence : "",
+        (e.classification && e.classification.source) || e.backend || "",
+        e.action,
+        e.userOverride || "",
+        e.classification ? e.classification.reason : "",
+      ].map(cell)
+    );
+    return "﻿" + [headers.map(cell).join(","), ...rows.map((r) => r.join(","))].join("\r\n");
   },
 };

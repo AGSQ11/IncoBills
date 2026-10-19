@@ -2,12 +2,11 @@
   IncoBills — AI-Powered Invoice Detection for Thunderbird
   https://github.com/serverspan/incobills
 
-  Popup — Toolbar popup UI
+  Popup — toolbar popup UI
 
   Author:      ServerSpan (https://www.serverspan.com)
   Copyright:   2026 ServerSpan
   License:     MIT
-  Version:     1.0.0
 -->
 <!DOCTYPE html>
 <html>
@@ -17,80 +16,67 @@
 </head>
 <body>
   <div class="popup">
-    <!-- Header -->
     <div class="header">
       <div class="header-left">
         <img src="../icons/icon-32.svg" alt="" class="logo">
         <span class="title">IncoBills</span>
       </div>
-      <label class="toggle">
-        <input type="checkbox" id="enableToggle" checked>
+      <label class="toggle" data-i18n-title="popupToggleTitle">
+        <input type="checkbox" id="enableToggle" checked data-i18n-aria-label="popupToggleTitle">
         <span class="toggle-slider"></span>
       </label>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="main">IncoBills</button>
-      <button class="tab-btn" data-tab="saga">SAGA <span id="sagaBadge" class="tab-badge"></span></button>
+    <div id="backendWarning" class="warning" role="status" hidden></div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" data-tab="main" role="tab">IncoBills</button>
+      <button class="tab-btn" data-tab="saga" role="tab">SAGA <span id="sagaBadge" class="tab-badge"></span></button>
     </div>
 
-    <!-- Main Tab -->
-    <div id="tab-main" class="tab-panel active">
-      <!-- Stats -->
+    <div id="tab-main" class="tab-panel active" role="tabpanel">
       <div class="stats">
-        <div class="stat">
-          <span class="stat-value" id="todayCount">0</span>
-          <span class="stat-label">Today</span>
-        </div>
+        <div class="stat"><span class="stat-value" id="todayCount">0</span><span class="stat-label" data-i18n="statToday"></span></div>
         <div class="stat-divider"></div>
-        <div class="stat">
-          <span class="stat-value" id="monthCount">0</span>
-          <span class="stat-label">This month</span>
-        </div>
+        <div class="stat"><span class="stat-value" id="monthCount">0</span><span class="stat-label" data-i18n="statMonth"></span></div>
         <div class="stat-divider"></div>
-        <div class="stat">
-          <span class="stat-value" id="totalCount">0</span>
-          <span class="stat-label">Total</span>
-        </div>
+        <div class="stat"><span class="stat-value" id="totalCount">0</span><span class="stat-label" data-i18n="statTotal"></span></div>
       </div>
-
-      <!-- Recent detections -->
       <div class="section">
-        <div class="section-title">Recent invoices</div>
+        <div class="section-title" data-i18n="recentInvoices"></div>
         <div id="recentList" class="recent-list">
-          <div class="empty-state">No invoices detected yet.</div>
+          <div class="empty-state" data-i18n="noInvoicesYet"></div>
         </div>
       </div>
     </div>
 
-    <!-- SAGA Tab -->
-    <div id="tab-saga" class="tab-panel">
-      <div class="saga-popup-header">
-        <div class="saga-popup-stat">
-          <span class="stat-value" id="sagaQueueCount">0</span>
-          <span class="stat-label">În coadă</span>
-        </div>
+    <div id="tab-saga" class="tab-panel" role="tabpanel">
+      <div class="stats">
+        <div class="stat"><span class="stat-value" id="sagaReadyCount">0</span><span class="stat-label" data-i18n="sagaReady"></span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-value" id="sagaReviewCount">0</span><span class="stat-label" data-i18n="sagaToReview"></span></div>
+        <div class="stat-divider"></div>
+        <div class="stat"><span class="stat-value" id="sagaFailedCount">0</span><span class="stat-label" data-i18n="sagaFailed"></span></div>
       </div>
-
       <div class="section">
-        <div class="section-title">Facturi recente</div>
+        <div class="section-title" data-i18n="sagaRecent"></div>
         <div id="sagaRecentList" class="recent-list">
-          <div class="empty-state">Nicio factură în coadă.</div>
+          <div class="empty-state" data-i18n="queueEmpty"></div>
         </div>
       </div>
-
-      <div class="footer">
-        <button id="btnSagaExport" class="btn btn-primary">Exportă Tot</button>
+      <div id="sagaStatus" class="popup-status" role="status"></div>
+      <div class="footer footer-split">
+        <button id="btnSagaReview" class="btn btn-secondary" data-i18n="btnOpenReview"></button>
+        <button id="btnSagaExport" class="btn btn-primary" data-i18n="btnExportReady"></button>
       </div>
     </div>
 
-    <!-- Footer buttons -->
     <div class="footer">
-      <button id="btnSettings" class="btn btn-secondary">Settings</button>
+      <button id="btnSettings" class="btn btn-secondary" data-i18n="btnSettings"></button>
     </div>
   </div>
 
+  <script src="../shared/i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

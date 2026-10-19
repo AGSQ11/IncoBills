@@ -2,18 +2,17 @@
   IncoBills — AI-Powered Invoice Detection for Thunderbird
   https://github.com/serverspan/incobills
 
-  Options — Full settings page
+  Options — full settings page
 
   Author:      ServerSpan (https://www.serverspan.com)
   Copyright:   2026 ServerSpan
   License:     MIT
-  Version:     1.0.0
 -->
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>IncoBills Settings</title>
+  <title data-i18n="optionsTitle">IncoBills Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -22,196 +21,196 @@
       <img src="../icons/icon-48.svg" alt="" class="page-logo">
       <div>
         <h1>IncoBills</h1>
-        <p class="subtitle">AI-powered invoice detection for Thunderbird</p>
+        <p class="subtitle" data-i18n="optionsSubtitle"></p>
       </div>
     </header>
 
+    <div id="backendBanner" class="banner banner-warn" role="status" hidden></div>
+
     <!-- ========== AI Backend ========== -->
     <section class="card">
-      <h2>AI Backend</h2>
-      <p class="card-desc">Choose how emails are classified. AI backends are more accurate; keywords work offline with zero setup.</p>
+      <h2 data-i18n="secBackend"></h2>
+      <p class="card-desc" data-i18n="secBackendDesc"></p>
 
       <div class="backend-options">
-        <!-- Claude -->
         <div class="radio-card" data-radio="claude">
           <input type="radio" name="aiBackend" value="claude" id="radioClaude">
           <label for="radioClaude" class="radio-card-body">
-            <div class="radio-card-title">Claude API <span class="badge badge-rec">Recommended</span></div>
-            <p>Anthropic Claude Haiku &mdash; fast, accurate, ~$1/month at typical volume.</p>
+            <div class="radio-card-title"><span data-i18n="backendClaude"></span> <span class="badge badge-rec" data-i18n="badgeRecommended"></span></div>
+            <p data-i18n="backendClaudeDesc"></p>
           </label>
           <div class="field-group backend-field" data-backend="claude">
-            <label>API URL</label>
+            <label for="claudeApiUrl" data-i18n="lblApiUrl"></label>
             <input type="text" id="claudeApiUrl" placeholder="https://api.anthropic.com">
-            <label>API Key</label>
+            <label for="claudeApiKey" data-i18n="lblApiKey"></label>
             <div class="input-row">
-              <input type="password" id="claudeApiKey" placeholder="sk-ant-...">
-              <button class="btn btn-sm" id="testClaude">Test</button>
+              <input type="password" id="claudeApiKey" placeholder="sk-ant-..." autocomplete="off">
+              <button class="btn btn-sm" id="testClaude" data-i18n="btnTest"></button>
             </div>
-            <label>Model</label>
-            <input type="text" id="claudeModel" placeholder="claude-haiku-4-5-20251001">
+            <label for="claudeModel" data-i18n="lblModelClassify"></label>
+            <input type="text" id="claudeModel" placeholder="claude-haiku-5-5">
+            <label for="claudeExtractModel" data-i18n="lblModelExtract"></label>
+            <input type="text" id="claudeExtractModel" placeholder="claude-sonnet-5-5">
           </div>
         </div>
 
-        <!-- OpenAI -->
         <div class="radio-card" data-radio="openai">
           <input type="radio" name="aiBackend" value="openai" id="radioOpenai">
           <label for="radioOpenai" class="radio-card-body">
-            <div class="radio-card-title">OpenAI API</div>
-            <p>GPT-4o-mini &mdash; similar accuracy, comparable cost.</p>
+            <div class="radio-card-title" data-i18n="backendOpenai"></div>
+            <p data-i18n="backendOpenaiDesc"></p>
           </label>
           <div class="field-group backend-field" data-backend="openai">
-            <label>API URL</label>
+            <label for="openaiApiUrl" data-i18n="lblApiUrl"></label>
             <input type="text" id="openaiApiUrl" placeholder="https://api.openai.com">
-            <label>API Key</label>
+            <label for="openaiApiKey" data-i18n="lblApiKey"></label>
             <div class="input-row">
-              <input type="password" id="openaiApiKey" placeholder="sk-...">
-              <button class="btn btn-sm" id="testOpenai">Test</button>
+              <input type="password" id="openaiApiKey" placeholder="sk-..." autocomplete="off">
+              <button class="btn btn-sm" id="testOpenai" data-i18n="btnTest"></button>
             </div>
-            <label>Model</label>
-            <input type="text" id="openaiModel" placeholder="gpt-4o-mini">
+            <label for="openaiModel" data-i18n="lblModelClassify"></label>
+            <input type="text" id="openaiModel" placeholder="gpt-6-luna">
+            <label for="openaiExtractModel" data-i18n="lblModelExtract"></label>
+            <input type="text" id="openaiExtractModel" placeholder="gpt-6-luna">
           </div>
         </div>
 
-        <!-- Ollama -->
         <div class="radio-card" data-radio="ollama">
           <input type="radio" name="aiBackend" value="ollama" id="radioOllama">
           <label for="radioOllama" class="radio-card-body">
-            <div class="radio-card-title">Local Ollama <span class="badge badge-priv">Private</span></div>
-            <p>Fully local &mdash; no data leaves your machine. Requires Ollama installed.</p>
+            <div class="radio-card-title"><span data-i18n="backendOllama"></span> <span class="badge badge-priv" data-i18n="badgePrivate"></span></div>
+            <p data-i18n="backendOllamaDesc"></p>
           </label>
           <div class="field-group backend-field" data-backend="ollama">
-            <label>Ollama URL</label>
+            <label for="ollamaUrl" data-i18n="lblOllamaUrl"></label>
             <div class="input-row">
               <input type="text" id="ollamaUrl" placeholder="http://127.0.0.1:11434">
-              <button class="btn btn-sm" id="testOllama">Test</button>
+              <button class="btn btn-sm" id="testOllama" data-i18n="btnTest"></button>
             </div>
-            <label>Model</label>
+            <label for="ollamaModel" data-i18n="lblModelClassify"></label>
             <input type="text" id="ollamaModel" placeholder="llama3.2:3b">
+            <label for="ollamaExtractModel" data-i18n="lblModelExtractOllama"></label>
+            <input type="text" id="ollamaExtractModel" data-i18n-placeholder="phSameAsClassify">
+            <p class="hint" data-i18n="hintOllamaOrigins"></p>
           </div>
         </div>
 
-        <!-- Keywords -->
         <div class="radio-card" data-radio="keywords">
           <input type="radio" name="aiBackend" value="keywords" id="radioKeywords">
           <label for="radioKeywords" class="radio-card-body">
-            <div class="radio-card-title">Keywords Only <span class="badge badge-free">Free</span></div>
-            <p>Pattern matching with no AI &mdash; catches obvious invoices. Zero setup, zero cost.</p>
+            <div class="radio-card-title"><span data-i18n="backendKeywords"></span> <span class="badge badge-free" data-i18n="badgeFree"></span></div>
+            <p data-i18n="backendKeywordsDesc"></p>
           </label>
         </div>
       </div>
+      <p class="hint" data-i18n="hintPrivacy"></p>
     </section>
 
-    <!-- ========== Detection Settings ========== -->
+    <!-- ========== Detection ========== -->
     <section class="card">
-      <h2>Detection</h2>
-
+      <h2 data-i18n="secDetection"></h2>
       <div class="field-group">
-        <label>Confidence threshold</label>
+        <label for="confidenceThreshold" data-i18n="lblThreshold"></label>
         <div class="slider-row">
           <input type="range" id="confidenceThreshold" min="0.1" max="1.0" step="0.05" value="0.70">
           <span id="thresholdValue" class="slider-value">0.70</span>
         </div>
-        <p class="hint">Lower = more aggressive (may catch non-invoices). Higher = more conservative (may miss some).</p>
+        <p class="hint" data-i18n="hintThreshold"></p>
       </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="hybridMode" checked>
+        <span data-i18n="lblHybrid"></span>
+      </label>
+      <p class="hint indent" data-i18n="hintHybrid"></p>
     </section>
 
-    <!-- ========== Folder Settings ========== -->
+    <!-- ========== Folder ========== -->
     <section class="card">
-      <h2>Invoice Folder</h2>
-
+      <h2 data-i18n="secFolder"></h2>
       <div class="field-group">
-        <label>Folder name</label>
+        <label for="folderName" data-i18n="lblFolderName"></label>
         <input type="text" id="folderName" placeholder="Invoices">
-        <p class="hint">A subfolder for each month (e.g. 2026-04) is created automatically inside this folder.</p>
+        <p class="hint" data-i18n="hintFolderName"></p>
       </div>
-
       <div class="field-group">
-        <label>Folder mode</label>
+        <label data-i18n="lblFolderMode"></label>
         <div class="radio-group">
-          <label class="radio-inline">
-            <input type="radio" name="folderMode" value="perAccount" checked>
-            <span>Per account</span>
-          </label>
-          <label class="radio-inline">
-            <input type="radio" name="folderMode" value="unified">
-            <span>Unified (one mailbox)</span>
-          </label>
+          <label class="radio-inline"><input type="radio" name="folderMode" value="perAccount" checked><span data-i18n="optPerAccount"></span></label>
+          <label class="radio-inline"><input type="radio" name="folderMode" value="unified"><span data-i18n="optUnified"></span></label>
         </div>
-        <p class="hint">Per account: each mailbox gets its own Invoices tree. Unified: all invoices go to one mailbox.</p>
+        <p class="hint" data-i18n="hintFolderMode"></p>
       </div>
-
       <div class="field-group" id="unifiedAccountGroup" hidden>
-        <label>Target account for unified folder</label>
+        <label for="unifiedAccount" data-i18n="lblUnifiedAccount"></label>
         <select id="unifiedAccount">
-          <option value="">(auto-select first account)</option>
+          <option value="" data-i18n="optAutoFirstAccount"></option>
         </select>
       </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="allowLocalFoldersFallback">
+        <span data-i18n="lblLocalFallback"></span>
+      </label>
+      <p class="hint indent" data-i18n="hintLocalFallback"></p>
     </section>
 
     <!-- ========== Behavior ========== -->
     <section class="card">
-      <h2>Behavior</h2>
-
+      <h2 data-i18n="secBehavior"></h2>
       <div class="field-group">
-        <label>Action for detected emails</label>
+        <label data-i18n="lblAction"></label>
         <div class="radio-group">
-          <label class="radio-inline">
-            <input type="radio" name="mailAction" value="move" checked>
-            <span>Move</span>
-          </label>
-          <label class="radio-inline">
-            <input type="radio" name="mailAction" value="copy">
-            <span>Copy</span>
-          </label>
+          <label class="radio-inline"><input type="radio" name="mailAction" value="move" checked><span data-i18n="optMove"></span></label>
+          <label class="radio-inline"><input type="radio" name="mailAction" value="copy"><span data-i18n="optCopy"></span></label>
         </div>
-        <p class="hint">Move: remove from original folder. Copy: keep in original folder, duplicate to Invoices.</p>
+        <p class="hint" data-i18n="hintAction"></p>
       </div>
+      <label class="checkbox-row"><input type="checkbox" id="autoMove" checked><span data-i18n="lblAutoMove"></span></label>
+      <label class="checkbox-row"><input type="checkbox" id="showNotification" checked><span data-i18n="lblNotify"></span></label>
+      <label class="checkbox-row"><input type="checkbox" id="notifyOnly"><span data-i18n="lblNotifyOnly"></span></label>
+      <p class="hint" data-i18n="hintContextMenu"></p>
+    </section>
 
-      <label class="checkbox-row">
-        <input type="checkbox" id="autoMove" checked>
-        <span>Automatically apply action to detected invoices</span>
-      </label>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="showNotification" checked>
-        <span>Show desktop notification when an invoice is detected</span>
-      </label>
-
-      <label class="checkbox-row">
-        <input type="checkbox" id="notifyOnly">
-        <span>Notify only &mdash; do not move or copy emails (overrides above)</span>
-      </label>
+    <!-- ========== Accounts ========== -->
+    <section class="card">
+      <h2 data-i18n="secAccounts"></h2>
+      <p class="card-desc" data-i18n="secAccountsDesc"></p>
+      <div id="accountsList" class="accounts-list">
+        <div class="loading" data-i18n="loading"></div>
+      </div>
+      <p id="accountsWarning" class="hint hint-warn" data-i18n="warnNoAccounts" hidden></p>
     </section>
 
     <!-- ========== SAGA Export ========== -->
-    <section class="card" id="sagaSection">
-      <h2>SAGA Export <span class="badge badge-rec">RO</span></h2>
-      <p class="card-desc">Configurează firmele tale și gestionează exportul facturilor în format SAGA XML.</p>
+    <section class="card" id="saga">
+      <h2><span data-i18n="secSaga"></span> <span class="badge badge-rec">RO</span></h2>
+      <p class="card-desc" data-i18n="secSagaDesc"></p>
+      <div id="sagaBackendWarning" class="banner banner-warn" hidden></div>
 
-      <!-- Company Registry -->
       <div class="saga-subsection">
-        <h3>Firmele Mele</h3>
-        <div id="sagaCompaniesList" class="saga-companies-list">
-          <div class="loading">Nicio firmă configurată.</div>
-        </div>
-        <button class="btn btn-sm" id="btnAddCompany">Adaugă Firmă</button>
+        <h3 data-i18n="sagaCompanies"></h3>
+        <div id="sagaCompaniesList" class="saga-companies-list"></div>
+        <button class="btn btn-sm" id="btnAddCompany" data-i18n="btnAddCompany"></button>
       </div>
 
-      <!-- Add/Edit Company Form (hidden by default) -->
       <div id="sagaCompanyForm" class="saga-form" hidden>
-        <h4 id="sagaFormTitle">Adaugă Firmă</h4>
+        <h4 id="sagaFormTitle"></h4>
         <input type="hidden" id="sagaCompanyId">
         <div class="input-row">
-          <div><label>Denumire *</label><input type="text" id="sagaCompName" placeholder="MyCompany SRL"></div>
-          <div><label>CIF *</label><input type="text" id="sagaCompCif" placeholder="RO12345678"></div>
+          <div><label for="sagaCompCif" data-i18n="fldCifRequired"></label>
+            <div class="input-row tight">
+              <input type="text" id="sagaCompCif" placeholder="RO12345678">
+              <button class="btn btn-sm" id="btnAnafFill" data-i18n="btnAnafFill"></button>
+            </div>
+          </div>
+          <div><label for="sagaCompName" data-i18n="fldNameRequired"></label><input type="text" id="sagaCompName" placeholder="MyCompany SRL"></div>
         </div>
         <div class="input-row">
-          <div><label>Reg. Com. *</label><input type="text" id="sagaCompRegCom" placeholder="J40/1234/2020"></div>
-          <div><label>Capital *</label><input type="text" id="sagaCompCapital" placeholder="200"></div>
+          <div><label for="sagaCompRegCom" data-i18n="fldRegCom"></label><input type="text" id="sagaCompRegCom" placeholder="J08/1234/2020"></div>
+          <div><label for="sagaCompCapital" data-i18n="fldCapital"></label><input type="text" id="sagaCompCapital" placeholder="200"></div>
         </div>
         <div class="input-row">
-          <div><label>Țară *</label><input type="text" id="sagaCompCountry" value="RO"></div>
-          <div><label>Județ *</label>
+          <div><label for="sagaCompCountry" data-i18n="fldCountry"></label><input type="text" id="sagaCompCountry" value="RO"></div>
+          <div><label for="sagaCompCounty" data-i18n="fldCounty"></label>
             <select id="sagaCompCounty">
               <option value="B">București</option>
               <option value="AB">Alba</option>
@@ -259,125 +258,169 @@
           </div>
         </div>
         <div class="input-row">
-          <div><label>Localitate *</label><input type="text" id="sagaCompCity" placeholder="București"></div>
-          <div><label>Adresă *</label><input type="text" id="sagaCompAddress" placeholder="Str. Exemplu 1"></div>
+          <div><label for="sagaCompCity" data-i18n="fldCity"></label><input type="text" id="sagaCompCity" placeholder="Brașov"></div>
+          <div><label for="sagaCompAddress" data-i18n="fldAddress"></label><input type="text" id="sagaCompAddress" placeholder="Str. Exemplu 1"></div>
         </div>
         <div class="input-row">
-          <div><label>Bancă *</label><input type="text" id="sagaCompBank" placeholder="Banca Transilvania"></div>
-          <div><label>IBAN *</label><input type="text" id="sagaCompIban" placeholder="RO49AAAA..."></div>
+          <div><label for="sagaCompBank" data-i18n="fldBank"></label><input type="text" id="sagaCompBank" placeholder="Banca Transilvania"></div>
+          <div><label for="sagaCompIban" data-i18n="fldIban"></label><input type="text" id="sagaCompIban" placeholder="RO49AAAA1B31007593840000"></div>
         </div>
         <div class="input-row">
-          <div><label>Telefon *</label><input type="text" id="sagaCompPhone" placeholder="0712345678"></div>
-          <div><label>Email *</label><input type="email" id="sagaCompEmail" placeholder="contact@firma.ro"></div>
+          <div><label for="sagaCompPhone" data-i18n="fldPhone"></label><input type="text" id="sagaCompPhone" placeholder="0712345678"></div>
+          <div><label for="sagaCompEmail" data-i18n="fldEmail"></label><input type="email" id="sagaCompEmail" placeholder="contact@firma.ro"></div>
         </div>
+        <p id="sagaCompanyError" class="form-error" role="alert" hidden></p>
         <div class="form-actions">
-          <button class="btn btn-sm btn-primary" id="btnSaveCompany">Salvează</button>
-          <button class="btn btn-sm" id="btnCancelCompany">Anulează</button>
+          <button class="btn btn-sm btn-primary" id="btnSaveCompany" data-i18n="btnSave"></button>
+          <button class="btn btn-sm" id="btnCancelCompany" data-i18n="btnCancel"></button>
         </div>
       </div>
 
-      <!-- SAGA Settings -->
       <div class="saga-subsection">
-        <h3>Setări Export</h3>
+        <h3 data-i18n="sagaSettings"></h3>
         <div class="field-group">
-          <label>Subdirector export</label>
-          <input type="text" id="sagaExportSubdir" value="SAGA-Import">
-          <p class="hint">Fișierele XML vor fi salvate în Downloads/&lt;subdirector&gt;/</p>
+          <label for="sagaExportSubdir" data-i18n="lblExportSubdir"></label>
+          <input type="text" id="sagaExportSubdir" placeholder="SAGA-Import">
+          <p class="hint" data-i18n="hintExportSubdir"></p>
         </div>
-        <label class="checkbox-row">
-          <input type="checkbox" id="sagaAutoExtract" checked>
-          <span>Extrage automat facturile din PDF-uri</span>
-        </label>
+        <label class="checkbox-row"><input type="checkbox" id="sagaAutoExtract"><span data-i18n="lblAutoExtract"></span></label>
+        <label class="checkbox-row"><input type="checkbox" id="sagaCloudConsent"><span data-i18n="lblCloudConsent"></span></label>
+        <p class="hint indent" data-i18n="hintCloudConsent"></p>
+        <label class="checkbox-row"><input type="checkbox" id="sagaAnafLookup"><span data-i18n="lblAnafLookup"></span></label>
+        <p class="hint indent" data-i18n="hintAnafLookup"></p>
+        <label class="checkbox-row"><input type="checkbox" id="sagaSkipDomestic"><span data-i18n="lblSkipDomestic"></span></label>
+        <p class="hint indent" data-i18n="hintSkipDomestic"></p>
       </div>
 
-      <!-- Invoice Queue -->
       <div class="saga-subsection">
-        <h3>Coada Facturi <span id="sagaQueueCount" class="badge">0</span></h3>
+        <h3><span data-i18n="sagaQueue"></span> <span id="sagaQueueCount" class="badge">0</span></h3>
+        <p class="hint" data-i18n="hintQueue"></p>
         <div class="saga-queue-toolbar">
-          <button class="btn btn-sm" id="btnSagaExportAll">Exportă Tot</button>
-          <button class="btn btn-sm btn-danger" id="btnSagaClearQueue">Golește Coada</button>
+          <button class="btn btn-sm btn-primary" id="btnSagaExportAll" data-i18n="btnExportReady"></button>
+          <button class="btn btn-sm btn-danger" id="btnSagaClearQueue" data-i18n="btnClearQueue"></button>
+          <span id="sagaQueueStatus" class="inline-status" role="status"></span>
         </div>
-        <div id="sagaQueueList" class="saga-queue-list">
-          <div class="loading">Nicio factură în coadă.</div>
-        </div>
+        <div id="sagaQueueList" class="saga-queue-list"></div>
       </div>
     </section>
 
-    <!-- ========== Accounts ========== -->
+    <!-- ========== Sender rules ========== -->
     <section class="card">
-      <h2>Accounts to Monitor</h2>
-      <p class="card-desc">Select which accounts to scan. If none are selected, all accounts are monitored.</p>
-      <div id="accountsList" class="accounts-list">
-        <div class="loading">Loading accounts...</div>
-      </div>
+      <h2 data-i18n="secRules"></h2>
+      <p class="card-desc" data-i18n="secRulesDesc"></p>
+      <div id="rulesList" class="rules-list"></div>
     </section>
 
-    <!-- ========== Scan Existing ========== -->
+    <!-- ========== Scan ========== -->
     <section class="card">
-      <h2>Scan Existing Emails</h2>
-      <p class="card-desc">Scan your inbox for invoices you may have missed before installing IncoBills.</p>
-
+      <h2 data-i18n="secScan"></h2>
+      <p class="card-desc" data-i18n="secScanDesc"></p>
       <div class="field-group">
         <div class="input-row">
-          <div>
-            <label>From</label>
-            <input type="date" id="scanFrom">
-          </div>
-          <div>
-            <label>To</label>
-            <input type="date" id="scanTo">
-          </div>
-          <div>
-            <label>Account</label>
-            <select id="scanAccount">
-              <option value="">All accounts</option>
-            </select>
+          <div><label for="scanFrom" data-i18n="lblFrom"></label><input type="date" id="scanFrom"></div>
+          <div><label for="scanTo" data-i18n="lblTo"></label><input type="date" id="scanTo"></div>
+          <div><label for="scanAccount" data-i18n="lblAccount"></label>
+            <select id="scanAccount"><option value="" data-i18n="optAllMonitored"></option></select>
           </div>
         </div>
-        <button class="btn btn-primary" id="btnScan">Scan Now</button>
+        <div class="button-row">
+          <button class="btn btn-primary" id="btnScan" data-i18n="btnScan"></button>
+          <button class="btn" id="btnCancelScan" data-i18n="btnCancelScan" hidden></button>
+          <button class="btn btn-sm" id="btnResetProcessed" data-i18n="btnResetProcessed"></button>
+        </div>
+        <p class="hint" data-i18n="hintScan"></p>
         <div id="scanProgress" class="scan-progress" hidden>
           <div class="progress-bar"><div class="progress-fill" id="scanFill"></div></div>
-          <span id="scanStatus">Scanning...</span>
+          <span id="scanStatus" role="status"></span>
         </div>
       </div>
     </section>
 
     <!-- ========== History ========== -->
     <section class="card">
-      <h2>Classification History</h2>
+      <h2 data-i18n="secHistory"></h2>
       <div class="history-toolbar">
-        <button class="btn btn-sm" id="btnExportCSV">Export CSV</button>
-        <button class="btn btn-sm btn-danger" id="btnClearHistory">Clear History</button>
+        <button class="btn btn-sm" id="btnExportCSV" data-i18n="btnExportCsv"></button>
+        <button class="btn btn-sm btn-danger" id="btnClearHistory" data-i18n="btnClearHistory"></button>
       </div>
       <div class="table-wrap">
         <table id="historyTable">
           <thead>
             <tr>
-              <th class="sortable" id="sortDate">Date &#9660;</th>
-              <th>From</th>
-              <th>Subject</th>
-              <th>Conf.</th>
-              <th>Backend</th>
-              <th>Action</th>
+              <th class="sortable" id="sortDate"></th>
+              <th data-i18n="colFrom"></th>
+              <th data-i18n="colSubject"></th>
+              <th data-i18n="colConfidence"></th>
+              <th data-i18n="colSource"></th>
+              <th data-i18n="colAction"></th>
             </tr>
           </thead>
-          <tbody id="historyBody">
-            <tr><td colspan="6" class="empty-cell">No history yet.</td></tr>
-          </tbody>
+          <tbody id="historyBody"></tbody>
         </table>
       </div>
       <div class="history-footer">
-        <button class="btn btn-sm" id="btnLoadMore" hidden>Load more</button>
+        <button class="btn btn-sm" id="btnLoadMore" data-i18n="btnLoadMore" hidden></button>
       </div>
     </section>
 
-    <!-- ========== Save ========== -->
     <div class="save-bar">
-      <span id="saveStatus" class="save-status"></span>
-      <button class="btn btn-primary btn-lg" id="btnSave">Save Settings</button>
+      <span id="saveStatus" class="save-status" role="status"></span>
+      <button class="btn btn-primary btn-lg" id="btnSave" data-i18n="btnSaveSettings"></button>
     </div>
   </div>
 
+  <!-- ========== Review dialog ========== -->
+  <dialog id="reviewDialog" class="review-dialog">
+    <form method="dialog" id="reviewForm">
+      <header class="review-header">
+        <h3 id="reviewTitle" data-i18n="reviewTitle"></h3>
+        <p id="reviewSource" class="hint"></p>
+      </header>
+      <div id="reviewValidation" class="review-validation"></div>
+      <div class="review-grid" id="reviewHeaderFields"></div>
+      <div class="review-parties">
+        <fieldset>
+          <legend data-i18n="reviewSupplier"></legend>
+          <div class="review-grid" id="reviewSupplierFields"></div>
+        </fieldset>
+        <fieldset>
+          <legend data-i18n="reviewClient"></legend>
+          <div class="review-grid" id="reviewClientFields"></div>
+        </fieldset>
+      </div>
+      <h4 data-i18n="reviewLines"></h4>
+      <div class="table-wrap">
+        <table class="lines-table">
+          <thead>
+            <tr>
+              <th data-i18n="colDescription"></th>
+              <th data-i18n="colUnit"></th>
+              <th data-i18n="colQty"></th>
+              <th data-i18n="colPrice"></th>
+              <th data-i18n="colValue"></th>
+              <th data-i18n="colVatRate"></th>
+              <th data-i18n="colVat"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="reviewLines"></tbody>
+        </table>
+      </div>
+      <div class="button-row">
+        <button type="button" class="btn btn-sm" id="btnAddLine" data-i18n="btnAddLine"></button>
+        <button type="button" class="btn btn-sm" id="btnRecalcTotals" data-i18n="btnRecalcTotals"></button>
+      </div>
+      <footer class="review-footer">
+        <span id="reviewStatus" class="inline-status" role="status"></span>
+        <button type="button" class="btn" id="btnReviewCancel" data-i18n="btnCancel"></button>
+        <button type="button" class="btn" id="btnReviewSave" data-i18n="btnSave"></button>
+        <button type="button" class="btn btn-primary" id="btnReviewApprove" data-i18n="btnSaveReviewed"></button>
+      </footer>
+    </form>
+  </dialog>
+
+  <script src="../shared/constants.js"></script>
+  <script src="../shared/i18n.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

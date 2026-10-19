@@ -1,0 +1,890 @@
+{
+  "extDescription": {
+    "message": "Detectare facturi cu AI: găsește emailurile cu facturi din toate conturile Thunderbird, le sortează în foldere lunare și exportă facturile românești în SAGA."
+  },
+  "optionsTitle": {
+    "message": "Setări IncoBills"
+  },
+  "optionsSubtitle": {
+    "message": "Detectare facturi cu AI pentru Thunderbird"
+  },
+  "loading": {
+    "message": "Se încarcă…"
+  },
+  "unknown": {
+    "message": "Necunoscut"
+  },
+  "noSubject": {
+    "message": "(fără subiect)"
+  },
+  "saved": {
+    "message": "Setările au fost salvate."
+  },
+  "saveFailed": {
+    "message": "Salvarea a eșuat: $1"
+  },
+  "btnSave": {
+    "message": "Salvează"
+  },
+  "btnSaveSettings": {
+    "message": "Salvează setările"
+  },
+  "btnCancel": {
+    "message": "Anulează"
+  },
+  "btnDelete": {
+    "message": "Șterge"
+  },
+  "btnEdit": {
+    "message": "Editează"
+  },
+  "btnTest": {
+    "message": "Testează"
+  },
+  "btnSettings": {
+    "message": "Setări"
+  },
+  "testing": {
+    "message": "Se testează…"
+  },
+  "testOk": {
+    "message": "OK"
+  },
+  "testFailed": {
+    "message": "Eșuat"
+  },
+  "testFailedDetail": {
+    "message": "Testul conexiunii a eșuat:\n$1"
+  },
+  "secBackend": {
+    "message": "Motor AI"
+  },
+  "secBackendDesc": {
+    "message": "Alege cum sunt clasificate emailurile. Motoarele AI sunt mai precise; cuvintele cheie funcționează offline, fără configurare."
+  },
+  "backendClaude": {
+    "message": "Claude API"
+  },
+  "backendClaudeDesc": {
+    "message": "Anthropic Claude. Rapid și precis. Citește facturile PDF pentru exportul SAGA."
+  },
+  "backendOpenai": {
+    "message": "OpenAI API"
+  },
+  "backendOpenaiDesc": {
+    "message": "Modele OpenAI. Precizie similară. Funcționează și cu servere compatibile OpenAI."
+  },
+  "backendOllama": {
+    "message": "Ollama local"
+  },
+  "backendOllamaDesc": {
+    "message": "Complet local: nicio dată nu pleacă de pe calculator. Necesită Ollama."
+  },
+  "backendKeywords": {
+    "message": "Doar cuvinte cheie"
+  },
+  "backendKeywordsDesc": {
+    "message": "Potrivire de tipare fără AI. Prinde facturile evidente. Fără configurare, fără cost."
+  },
+  "backendName_claude": {
+    "message": "Claude"
+  },
+  "backendName_openai": {
+    "message": "OpenAI"
+  },
+  "backendName_ollama": {
+    "message": "Ollama"
+  },
+  "backendName_keywords": {
+    "message": "Cuvinte cheie"
+  },
+  "badgeRecommended": {
+    "message": "Recomandat"
+  },
+  "badgePrivate": {
+    "message": "Privat"
+  },
+  "badgeFree": {
+    "message": "Gratuit"
+  },
+  "lblApiUrl": {
+    "message": "URL API"
+  },
+  "lblApiKey": {
+    "message": "Cheie API"
+  },
+  "lblOllamaUrl": {
+    "message": "URL Ollama"
+  },
+  "lblModelClassify": {
+    "message": "Model pentru clasificarea emailurilor"
+  },
+  "lblModelExtract": {
+    "message": "Model pentru extragerea facturilor (SAGA)"
+  },
+  "lblModelExtractOllama": {
+    "message": "Model pentru extragerea facturilor (SAGA, opțional)"
+  },
+  "phSameAsClassify": {
+    "message": "La fel ca modelul de clasificare"
+  },
+  "hintOllamaOrigins": {
+    "message": "Pornește Ollama cu OLLAMA_ORIGINS=\"moz-extension://*\". Nu folosi \"*\": orice site web ar putea folosi Ollama local."
+  },
+  "hintPrivacy": {
+    "message": "Confidențialitate: pentru clasificare, IncoBills trimite expeditorul, subiectul, numele atașamentelor și primele 1000 de caractere din text. Pentru exportul SAGA cu Claude/OpenAI se trimite tot PDF-ul atașat (doar cu acordul tău de mai jos). Un URL API personalizat cere o permisiune la salvare."
+  },
+  "secDetection": {
+    "message": "Detectare"
+  },
+  "lblThreshold": {
+    "message": "Prag de încredere"
+  },
+  "hintThreshold": {
+    "message": "Mai mic = mai agresiv (poate prinde și altceva). Mai mare = mai prudent (poate rata unele facturi)."
+  },
+  "lblHybrid": {
+    "message": "Mod hibrid: folosește AI doar când cuvintele cheie nu sunt sigure"
+  },
+  "hintHybrid": {
+    "message": "Emailurile fără niciun semn de factură sunt ignorate, iar facturile foarte clare sunt acceptate, fără apel AI. Costul API scade mult."
+  },
+  "secFolder": {
+    "message": "Folder facturi"
+  },
+  "lblFolderName": {
+    "message": "Nume folder"
+  },
+  "hintFolderName": {
+    "message": "În acest folder se creează automat un subfolder pentru fiecare lună (de ex. 2026-10)."
+  },
+  "lblFolderMode": {
+    "message": "Mod folder"
+  },
+  "optPerAccount": {
+    "message": "Pe fiecare cont"
+  },
+  "optUnified": {
+    "message": "Unificat (o singură căsuță)"
+  },
+  "hintFolderMode": {
+    "message": "Pe fiecare cont: fiecare căsuță are propriul folder. Unificat: toate facturile merg într-o singură căsuță."
+  },
+  "lblUnifiedAccount": {
+    "message": "Contul țintă pentru folderul unificat"
+  },
+  "optAutoFirstAccount": {
+    "message": "(primul cont)"
+  },
+  "lblLocalFallback": {
+    "message": "Dacă folderul nu poate fi creat pe server, folosește Local Folders"
+  },
+  "hintLocalFallback": {
+    "message": "Atenție: emailurile mutate în Local Folders sunt stocate doar pe acest calculator, nu pe server."
+  },
+  "secBehavior": {
+    "message": "Comportament"
+  },
+  "lblAction": {
+    "message": "Acțiune pentru emailurile detectate"
+  },
+  "optMove": {
+    "message": "Mută"
+  },
+  "optCopy": {
+    "message": "Copiază"
+  },
+  "hintAction": {
+    "message": "Mută: scoate emailul din folderul original. Copiază: păstrează originalul și pune o copie în folderul de facturi."
+  },
+  "lblAutoMove": {
+    "message": "Aplică acțiunea automat"
+  },
+  "lblNotify": {
+    "message": "Arată o notificare când este detectată o factură"
+  },
+  "lblNotifyOnly": {
+    "message": "Doar notificare: nu muta și nu copia emailurile (are prioritate)"
+  },
+  "hintContextMenu": {
+    "message": "Sfat: clic dreapta pe un mesaj și alege „IncoBills: Marchează ca factură” sau „Nu este factură”. IncoBills reține expeditorul."
+  },
+  "secAccounts": {
+    "message": "Conturi monitorizate"
+  },
+  "secAccountsDesc": {
+    "message": "Când toate conturile sunt bifate, și conturile noi sunt monitorizate."
+  },
+  "noAccounts": {
+    "message": "Nu am găsit conturi de email."
+  },
+  "warnNoAccounts": {
+    "message": "Niciun cont nu este bifat: IncoBills nu va procesa emailurile noi."
+  },
+  "secSaga": {
+    "message": "Export SAGA"
+  },
+  "secSagaDesc": {
+    "message": "Extrage datele din facturile detectate și exportă fișiere XML pentru SAGA. Atașamentele e-Factura XML sunt citite exact; facturile PDF au nevoie de un motor AI."
+  },
+  "sagaCompanies": {
+    "message": "Firmele mele"
+  },
+  "noCompanies": {
+    "message": "Nicio firmă configurată. Adaugă cel puțin o firmă pentru a activa exportul SAGA."
+  },
+  "btnAddCompany": {
+    "message": "Adaugă firmă"
+  },
+  "titleAddCompany": {
+    "message": "Adaugă firmă"
+  },
+  "titleEditCompany": {
+    "message": "Editează firma"
+  },
+  "btnAnafFill": {
+    "message": "Completează din ANAF"
+  },
+  "fldCifRequired": {
+    "message": "CIF *"
+  },
+  "fldNameRequired": {
+    "message": "Denumire *"
+  },
+  "fldRegCom": {
+    "message": "Nr. Reg. Com."
+  },
+  "fldCapital": {
+    "message": "Capital social"
+  },
+  "fldCountry": {
+    "message": "Țară"
+  },
+  "fldCounty": {
+    "message": "Județ"
+  },
+  "fldCountyShort": {
+    "message": "Județ"
+  },
+  "fldCity": {
+    "message": "Localitate"
+  },
+  "fldAddress": {
+    "message": "Adresă"
+  },
+  "fldBank": {
+    "message": "Bancă"
+  },
+  "fldIban": {
+    "message": "IBAN"
+  },
+  "fldPhone": {
+    "message": "Telefon"
+  },
+  "fldEmail": {
+    "message": "Email"
+  },
+  "confirmDeleteCompany": {
+    "message": "Ștergi această firmă?"
+  },
+  "errCompanyExists": {
+    "message": "Există deja o firmă cu CIF-ul $1."
+  },
+  "errCompanyNotFound": {
+    "message": "Firma nu a fost găsită."
+  },
+  "errAnafNotFound": {
+    "message": "ANAF nu are date pentru acest CIF (verifică CIF-ul)."
+  },
+  "valCompanyNameRequired": {
+    "message": "Denumirea firmei este obligatorie."
+  },
+  "valCompanyCifRequired": {
+    "message": "CIF-ul este obligatoriu."
+  },
+  "sagaSettings": {
+    "message": "Setări export"
+  },
+  "lblExportSubdir": {
+    "message": "Subfolder export"
+  },
+  "hintExportSubdir": {
+    "message": "Fișierele XML sunt salvate în Downloads/<subfolder>/."
+  },
+  "lblAutoExtract": {
+    "message": "Extrage automat datele facturilor din emailurile detectate"
+  },
+  "lblCloudConsent": {
+    "message": "Sunt de acord să trimit facturile PDF complete către AI-ul cloud ales (Claude/OpenAI)"
+  },
+  "hintCloudConsent": {
+    "message": "Facturile pot conține date personale (GDPR). Fără acest acord, facturile PDF sunt extrase doar cu Ollama local. e-Factura XML nu pleacă niciodată de pe calculator."
+  },
+  "lblAnafLookup": {
+    "message": "Completează datele partenerului și statutul TVA din registrul public ANAF"
+  },
+  "hintAnafLookup": {
+    "message": "Doar numărul CIF și data facturii sunt trimise la webservicesp.anaf.ro."
+  },
+  "lblSkipDomestic": {
+    "message": "Ignoră facturile primite de la furnizori din România"
+  },
+  "hintSkipDomestic": {
+    "message": "Activează dacă imporți aceste facturi în SAGA direct din SPV (e-Factura). Atunci IncoBills se ocupă doar de facturile externe."
+  },
+  "warnSagaNeedsAi": {
+    "message": "Exportul SAGA este activ, dar motorul este „Doar cuvinte cheie”. Vor fi citite doar atașamentele e-Factura XML. Alege Claude, OpenAI sau Ollama pentru facturile PDF."
+  },
+  "warnSagaConsent": {
+    "message": "Facturile PDF nu vor fi extrase până nu ești de acord să le trimiți către AI-ul cloud (Setări export, mai jos)."
+  },
+  "sagaQueue": {
+    "message": "Coada de facturi"
+  },
+  "hintQueue": {
+    "message": "Verifică fiecare factură înainte de export. Elementele cu erori nu pot fi exportate până nu le corectezi."
+  },
+  "btnExportReady": {
+    "message": "Exportă cele gata"
+  },
+  "btnClearQueue": {
+    "message": "Golește coada"
+  },
+  "btnReview": {
+    "message": "Verifică"
+  },
+  "btnExportXml": {
+    "message": "Exportă XML"
+  },
+  "btnRetry": {
+    "message": "Reîncearcă"
+  },
+  "btnOpenReview": {
+    "message": "Verifică"
+  },
+  "queueEmpty": {
+    "message": "Nicio factură în coadă."
+  },
+  "confirmClearQueue": {
+    "message": "Golești coada? Elementele deschise și eșuate sunt șterse. Facturile exportate rămân, pentru detectarea duplicatelor."
+  },
+  "confirmRemoveQueueItem": {
+    "message": "Elimini acest element din coadă?"
+  },
+  "statusReady": {
+    "message": "Gata de export"
+  },
+  "statusNeedsReview": {
+    "message": "Necesită verificare"
+  },
+  "status_reviewed": {
+    "message": "Verificat"
+  },
+  "status_exported": {
+    "message": "Exportat"
+  },
+  "status_failed": {
+    "message": "Eșuat"
+  },
+  "status_nonInvoice": {
+    "message": "Nicio factură găsită"
+  },
+  "status_extracted": {
+    "message": "Nou"
+  },
+  "dirIntrari": {
+    "message": "Intrări"
+  },
+  "dirIesiri": {
+    "message": "Ieșiri"
+  },
+  "dirUnknown": {
+    "message": "Direcție necunoscută"
+  },
+  "valErrorsCount": {
+    "message": "$1 eroare(i)"
+  },
+  "valWarningsCount": {
+    "message": "$1 avertisment(e)"
+  },
+  "exportDone": {
+    "message": "Export finalizat: $1 fișier(e) salvat(e)."
+  },
+  "exportPartial": {
+    "message": "Export: $1 salvate, $2 eșuate. Prima eroare: $3"
+  },
+  "exportNothing": {
+    "message": "Nimic nu este gata de export."
+  },
+  "exportFailed": {
+    "message": "Exportul a eșuat."
+  },
+  "retrying": {
+    "message": "Se procesează din nou emailul…"
+  },
+  "retryDone": {
+    "message": "Gata: $1 factură(i) adăugată(e)."
+  },
+  "errNotExportable": {
+    "message": "Verifică întâi această factură (erori, direcție necunoscută sau fără firmă)."
+  },
+  "errQueueItemNotFound": {
+    "message": "Elementul nu a fost găsit în coadă."
+  },
+  "errQueueItemExported": {
+    "message": "Această factură este deja exportată."
+  },
+  "errQueueItemNoData": {
+    "message": "Acest element nu are date de factură."
+  },
+  "errRetryNoMessage": {
+    "message": "Emailul original nu a fost găsit."
+  },
+  "errRetryNoAttachments": {
+    "message": "Emailul nu are atașament PDF sau e-Factura."
+  },
+  "errSagaNeedsAi": {
+    "message": "Factura PDF nu a fost extrasă: alege Claude, OpenAI sau Ollama, apoi apasă Reîncearcă."
+  },
+  "errSagaNoConsent": {
+    "message": "Factura PDF nu a fost extrasă: acceptă trimiterea PDF-urilor către AI-ul cloud în setările SAGA, apoi apasă Reîncearcă."
+  },
+  "errPdfNoText": {
+    "message": "PDF-ul nu are text (este o imagine scanată). Folosește Claude sau OpenAI pentru această factură."
+  },
+  "errAttachmentTooLarge": {
+    "message": "Atașament prea mare: $1"
+  },
+  "reviewTitle": {
+    "message": "Verificare factură"
+  },
+  "reviewSupplier": {
+    "message": "Furnizor"
+  },
+  "reviewClient": {
+    "message": "Client"
+  },
+  "reviewLines": {
+    "message": "Linii"
+  },
+  "btnAddLine": {
+    "message": "Adaugă linie"
+  },
+  "btnRemoveLine": {
+    "message": "Elimină linia"
+  },
+  "btnRecalcTotals": {
+    "message": "Totaluri din linii"
+  },
+  "btnSaveReviewed": {
+    "message": "Salvează și marchează verificat"
+  },
+  "reviewApproved": {
+    "message": "Factura este verificată și gata de export."
+  },
+  "reviewHasErrors": {
+    "message": "Corectează erorile de mai sus înainte de a marca factura ca verificată."
+  },
+  "optAutoCompany": {
+    "message": "(potrivire după CIF)"
+  },
+  "fldDirection": {
+    "message": "Direcție"
+  },
+  "fldCompany": {
+    "message": "Firma mea"
+  },
+  "fldInvoiceNumber": {
+    "message": "Număr factură"
+  },
+  "fldInvoiceDate": {
+    "message": "Data facturii"
+  },
+  "fldDueDate": {
+    "message": "Data scadenței"
+  },
+  "fldCurrency": {
+    "message": "Monedă"
+  },
+  "fldTotalNet": {
+    "message": "Total fără TVA"
+  },
+  "fldTotalVat": {
+    "message": "Total TVA"
+  },
+  "fldTotalGross": {
+    "message": "Total cu TVA"
+  },
+  "fldReverseCharge": {
+    "message": "Taxare inversă"
+  },
+  "fldVatOnCollection": {
+    "message": "TVA la încasare"
+  },
+  "fldSupplierName": {
+    "message": "Denumire furnizor"
+  },
+  "fldSupplierCif": {
+    "message": "CIF furnizor"
+  },
+  "fldClientCif": {
+    "message": "CIF client"
+  },
+  "fldPartyNume": {
+    "message": "Denumire"
+  },
+  "fldPartyCif": {
+    "message": "CIF / Cod TVA"
+  },
+  "fldPartyRegCom": {
+    "message": "Nr. Reg. Com."
+  },
+  "fldPartyAdresa": {
+    "message": "Adresă"
+  },
+  "fldPartyLocalitate": {
+    "message": "Localitate"
+  },
+  "fldPartyJudet": {
+    "message": "Județ"
+  },
+  "fldPartyTara": {
+    "message": "Țară"
+  },
+  "fldPartyIBAN": {
+    "message": "IBAN"
+  },
+  "fldPartyBanca": {
+    "message": "Bancă"
+  },
+  "fldPartyTelefon": {
+    "message": "Telefon"
+  },
+  "fldPartyMail": {
+    "message": "Email"
+  },
+  "colDescription": {
+    "message": "Descriere"
+  },
+  "colUnit": {
+    "message": "UM"
+  },
+  "colQty": {
+    "message": "Cant."
+  },
+  "colPrice": {
+    "message": "Preț"
+  },
+  "colValue": {
+    "message": "Valoare"
+  },
+  "colVatRate": {
+    "message": "TVA %"
+  },
+  "colVat": {
+    "message": "TVA"
+  },
+  "valAllGood": {
+    "message": "Toate verificările au trecut."
+  },
+  "valDirectionUnknown": {
+    "message": "Direcția este necunoscută: nicio firmă de-a ta nu are CIF-ul furnizorului sau al clientului. Alege direcția și firma."
+  },
+  "valIntraGroup": {
+    "message": "Furnizorul și clientul sunt ambele firmele tale."
+  },
+  "valFieldRequired": {
+    "message": "Câmp obligatoriu gol: $1"
+  },
+  "valDateInvalid": {
+    "message": "$1 nu este o dată validă (AAAA-LL-ZZ): $2"
+  },
+  "valClientCifMissing": {
+    "message": "CIF-ul clientului lipsește (factură către persoană fizică?)."
+  },
+  "valCifChecksum": {
+    "message": "CIF-ul $1 nu trece verificarea cifrei de control. AI-ul l-a citit probabil greșit."
+  },
+  "valCifFormat": {
+    "message": "$1 are un format neobișnuit: $2"
+  },
+  "valIbanInvalid": {
+    "message": "IBAN-ul $1 nu este valid."
+  },
+  "valEmailInvalid": {
+    "message": "Emailul $1 nu este valid."
+  },
+  "valNoLines": {
+    "message": "Factura nu are linii."
+  },
+  "valLineValueMissing": {
+    "message": "Linia $1 nu are valoare."
+  },
+  "valLineMath": {
+    "message": "Linia $1: cantitate × preț = $2, dar valoarea = $3."
+  },
+  "valVatRateUnusual": {
+    "message": "Linia $1: cotă TVA neobișnuită $2%."
+  },
+  "valLineVat": {
+    "message": "Linia $1: TVA ar trebui să fie $2, dar este $3."
+  },
+  "valSumMismatch": {
+    "message": "Suma valorilor pe linii ($1) nu corespunde cu totalul fără TVA ($2)."
+  },
+  "valVatSumMismatch": {
+    "message": "Suma TVA pe linii ($1) nu corespunde cu totalul TVA ($2)."
+  },
+  "valTotalMismatch": {
+    "message": "Total fără TVA + TVA ($1) nu corespunde cu totalul cu TVA ($2)."
+  },
+  "valTotalsMissing": {
+    "message": "Totalurile facturii lipsesc."
+  },
+  "valReverseChargeWithVat": {
+    "message": "Este bifată taxarea inversă, dar factura are TVA."
+  },
+  "valPartnerInactive": {
+    "message": "ANAF afișează partenerul $1 ca inactiv. Deducerea TVA poate să nu fie permisă."
+  },
+  "valCompanyMissing": {
+    "message": "Alege căreia dintre firmele tale îi aparține factura."
+  },
+  "secRules": {
+    "message": "Reguli pentru expeditori"
+  },
+  "secRulesDesc": {
+    "message": "Create din meniul clic dreapta. O regulă decide fără cuvinte cheie și fără AI."
+  },
+  "noRules": {
+    "message": "Nicio regulă încă."
+  },
+  "ruleInvoice": {
+    "message": "Factură"
+  },
+  "ruleNotInvoice": {
+    "message": "Nu este factură"
+  },
+  "secScan": {
+    "message": "Scanează emailurile existente"
+  },
+  "secScanDesc": {
+    "message": "Găsește facturile primite înainte de instalarea IncoBills."
+  },
+  "lblFrom": {
+    "message": "De la"
+  },
+  "lblTo": {
+    "message": "Până la"
+  },
+  "lblAccount": {
+    "message": "Cont"
+  },
+  "optAllMonitored": {
+    "message": "Toate conturile monitorizate"
+  },
+  "btnScan": {
+    "message": "Scanează acum"
+  },
+  "btnCancelScan": {
+    "message": "Oprește scanarea"
+  },
+  "btnResetProcessed": {
+    "message": "Uită emailurile procesate"
+  },
+  "hintScan": {
+    "message": "Sunt ignorate Trimise, Ciorne, Coș, Spam, Șabloane și folderul de facturi. Sunt ignorate și emailurile procesate deja. Scanarea continuă dacă închizi pagina."
+  },
+  "confirmResetProcessed": {
+    "message": "Uiți ce emailuri au fost procesate? Următoarea scanare le verifică din nou (poate costa apeluri API)."
+  },
+  "resetProcessedDone": {
+    "message": "Gata. Următoarea scanare verifică din nou toate emailurile."
+  },
+  "scanCounting": {
+    "message": "Se numără emailurile…"
+  },
+  "scanPreparing": {
+    "message": "Se pregătește scanarea…"
+  },
+  "scanNothing": {
+    "message": "Nimic de scanat: toate cele $1 emailuri din interval au fost procesate."
+  },
+  "scanConfirmLocal": {
+    "message": "Scanezi $1 emailuri noi (din $2 în interval) cu cuvinte cheie?"
+  },
+  "scanConfirmAi": {
+    "message": "Scanezi $1 emailuri noi (din $2 în interval) cu $3?\n\nPână la aproximativ $4 tokeni de intrare.$5"
+  },
+  "scanHybridNote": {
+    "message": " Modul hibrid nu apelează AI-ul pentru cazurile clare, deci numărul real este de obicei mult mai mic."
+  },
+  "scanProgress": {
+    "message": "Se scanează: $1 / $2 emailuri, $3 factură(i) găsită(e)…"
+  },
+  "scanDone": {
+    "message": "Gata: $1 / $2 emailuri scanate, $3 factură(i) găsită(e)."
+  },
+  "scanCancelled": {
+    "message": "Oprit: $1 / $2 emailuri scanate, $3 factură(i) găsită(e)."
+  },
+  "scanFailed": {
+    "message": "Scanarea a eșuat: $1"
+  },
+  "errScanRunning": {
+    "message": "O scanare rulează deja."
+  },
+  "secHistory": {
+    "message": "Istoric clasificări"
+  },
+  "btnExportCsv": {
+    "message": "Exportă CSV"
+  },
+  "btnClearHistory": {
+    "message": "Șterge istoricul"
+  },
+  "btnLoadMore": {
+    "message": "Încarcă mai multe"
+  },
+  "confirmClearHistory": {
+    "message": "Ștergi istoricul clasificărilor? Acțiunea nu poate fi anulată."
+  },
+  "noHistory": {
+    "message": "Niciun istoric încă."
+  },
+  "colDate": {
+    "message": "Data"
+  },
+  "colFrom": {
+    "message": "Expeditor"
+  },
+  "colSubject": {
+    "message": "Subiect"
+  },
+  "colConfidence": {
+    "message": "Încr."
+  },
+  "colSource": {
+    "message": "Sursă"
+  },
+  "colAction": {
+    "message": "Acțiune"
+  },
+  "action_moved": {
+    "message": "mutat"
+  },
+  "action_copied": {
+    "message": "copiat"
+  },
+  "action_flagged": {
+    "message": "detectat"
+  },
+  "action_already": {
+    "message": "deja în folder"
+  },
+  "action_skipped": {
+    "message": "ignorat"
+  },
+  "action_move_failed": {
+    "message": "mutare eșuată"
+  },
+  "action_error": {
+    "message": "eroare"
+  },
+  "overrideInvoice": {
+    "message": "marcat factură"
+  },
+  "overrideNotInvoice": {
+    "message": "marcat non-factură"
+  },
+  "bannerBackendFailing": {
+    "message": "Motorul $1 nu funcționează, deci IncoBills folosește cuvinte cheie. Ultima eroare: $2"
+  },
+  "warnPermissionDenied": {
+    "message": "Permisiunea nu a fost acordată pentru $1: apelurile către acest URL vor eșua."
+  },
+  "errOllamaUnreachable": {
+    "message": "Ollama nu răspunde la $1. Verifică dacă rulează și dacă a fost pornit cu OLLAMA_ORIGINS=\"moz-extension://*\". Detaliu: $2"
+  },
+  "errOllamaForbidden": {
+    "message": "Ollama a refuzat cererea (403). Repornește Ollama cu OLLAMA_ORIGINS=\"moz-extension://*\"."
+  },
+  "errOllamaModelMissing": {
+    "message": "Modelul „$1” nu este instalat. Disponibile: $2"
+  },
+  "errCannotCreateFolder": {
+    "message": "Nu pot crea folderul „$1”. Creează-l manual sau permite folosirea Local Folders în setări."
+  },
+  "notifDetectedTitle": {
+    "message": "IncoBills: factură detectată"
+  },
+  "notifBatchMoved": {
+    "message": "$1 facturi detectate și mutate în „$2”."
+  },
+  "notifBatchCopied": {
+    "message": "$1 facturi detectate și copiate în „$2”."
+  },
+  "notifBatchDetected": {
+    "message": "$1 facturi detectate."
+  },
+  "notifBackendFailingTitle": {
+    "message": "IncoBills: motorul AI nu funcționează"
+  },
+  "notifBackendFailingBody": {
+    "message": "Apelurile $1 eșuează, deci se folosesc cuvinte cheie. Verifică Setările. Eroare: $2"
+  },
+  "notifMarkedInvoice": {
+    "message": "$1 mesaj(e) marcate ca factură. Expeditorul este reținut."
+  },
+  "notifMarkedNotInvoice": {
+    "message": "$1 mesaj(e) marcate ca non-factură. Expeditorul este reținut."
+  },
+  "menuMarkInvoice": {
+    "message": "IncoBills: Marchează ca factură"
+  },
+  "menuMarkNotInvoice": {
+    "message": "IncoBills: Nu este factură"
+  },
+  "popupToggleTitle": {
+    "message": "Pornește sau oprește detectarea facturilor"
+  },
+  "statToday": {
+    "message": "Azi"
+  },
+  "statMonth": {
+    "message": "Luna aceasta"
+  },
+  "statTotal": {
+    "message": "Total"
+  },
+  "recentInvoices": {
+    "message": "Facturi recente"
+  },
+  "noInvoicesYet": {
+    "message": "Nicio factură detectată încă."
+  },
+  "sagaReady": {
+    "message": "Gata"
+  },
+  "sagaToReview": {
+    "message": "De verificat"
+  },
+  "sagaFailed": {
+    "message": "Eșuate"
+  },
+  "sagaRecent": {
+    "message": "Coadă"
+  },
+  "timeJustNow": {
+    "message": "acum"
+  },
+  "timeMinutes": {
+    "message": "acum $1 min"
+  },
+  "timeHours": {
+    "message": "acum $1 h"
+  },
+  "timeDays": {
+    "message": "acum $1 z"
+  }
+}

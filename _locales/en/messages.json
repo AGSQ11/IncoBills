@@ -1,0 +1,890 @@
+{
+  "extDescription": {
+    "message": "AI-powered invoice detection: finds invoice emails in all your Thunderbird accounts, sorts them into monthly folders, and exports Romanian invoices to SAGA."
+  },
+  "optionsTitle": {
+    "message": "IncoBills Settings"
+  },
+  "optionsSubtitle": {
+    "message": "AI-powered invoice detection for Thunderbird"
+  },
+  "loading": {
+    "message": "Loading…"
+  },
+  "unknown": {
+    "message": "Unknown"
+  },
+  "noSubject": {
+    "message": "(no subject)"
+  },
+  "saved": {
+    "message": "Settings saved."
+  },
+  "saveFailed": {
+    "message": "Save failed: $1"
+  },
+  "btnSave": {
+    "message": "Save"
+  },
+  "btnSaveSettings": {
+    "message": "Save Settings"
+  },
+  "btnCancel": {
+    "message": "Cancel"
+  },
+  "btnDelete": {
+    "message": "Delete"
+  },
+  "btnEdit": {
+    "message": "Edit"
+  },
+  "btnTest": {
+    "message": "Test"
+  },
+  "btnSettings": {
+    "message": "Settings"
+  },
+  "testing": {
+    "message": "Testing…"
+  },
+  "testOk": {
+    "message": "OK"
+  },
+  "testFailed": {
+    "message": "Failed"
+  },
+  "testFailedDetail": {
+    "message": "Connection test failed:\n$1"
+  },
+  "secBackend": {
+    "message": "AI Backend"
+  },
+  "secBackendDesc": {
+    "message": "Choose how emails are classified. AI backends are more accurate; keywords work offline with zero setup."
+  },
+  "backendClaude": {
+    "message": "Claude API"
+  },
+  "backendClaudeDesc": {
+    "message": "Anthropic Claude. Fast and accurate. Reads PDF invoices for SAGA export."
+  },
+  "backendOpenai": {
+    "message": "OpenAI API"
+  },
+  "backendOpenaiDesc": {
+    "message": "OpenAI models. Similar accuracy. Also works with OpenAI-compatible servers."
+  },
+  "backendOllama": {
+    "message": "Local Ollama"
+  },
+  "backendOllamaDesc": {
+    "message": "Fully local: no data leaves your computer. Requires Ollama."
+  },
+  "backendKeywords": {
+    "message": "Keywords only"
+  },
+  "backendKeywordsDesc": {
+    "message": "Pattern matching without AI. Catches obvious invoices. Zero setup, zero cost."
+  },
+  "backendName_claude": {
+    "message": "Claude"
+  },
+  "backendName_openai": {
+    "message": "OpenAI"
+  },
+  "backendName_ollama": {
+    "message": "Ollama"
+  },
+  "backendName_keywords": {
+    "message": "Keywords"
+  },
+  "badgeRecommended": {
+    "message": "Recommended"
+  },
+  "badgePrivate": {
+    "message": "Private"
+  },
+  "badgeFree": {
+    "message": "Free"
+  },
+  "lblApiUrl": {
+    "message": "API URL"
+  },
+  "lblApiKey": {
+    "message": "API key"
+  },
+  "lblOllamaUrl": {
+    "message": "Ollama URL"
+  },
+  "lblModelClassify": {
+    "message": "Model for email classification"
+  },
+  "lblModelExtract": {
+    "message": "Model for invoice extraction (SAGA)"
+  },
+  "lblModelExtractOllama": {
+    "message": "Model for invoice extraction (SAGA, optional)"
+  },
+  "phSameAsClassify": {
+    "message": "Same as the classification model"
+  },
+  "hintOllamaOrigins": {
+    "message": "Start Ollama with OLLAMA_ORIGINS=\"moz-extension://*\". Do not use \"*\": it lets every website use your local Ollama."
+  },
+  "hintPrivacy": {
+    "message": "Privacy: for classification, IncoBills sends the sender, subject, attachment names and the first 1000 characters of the body. For SAGA export with Claude/OpenAI, the full PDF attachment is sent (only with your consent below). A custom API URL asks for a host permission when you save."
+  },
+  "secDetection": {
+    "message": "Detection"
+  },
+  "lblThreshold": {
+    "message": "Confidence threshold"
+  },
+  "hintThreshold": {
+    "message": "Lower = more aggressive (may catch non-invoices). Higher = more conservative (may miss some)."
+  },
+  "lblHybrid": {
+    "message": "Hybrid mode: use the AI only when keywords are not sure"
+  },
+  "hintHybrid": {
+    "message": "Emails with no invoice signal at all are skipped, and very clear invoices are accepted, without an AI call. This cuts API cost a lot."
+  },
+  "secFolder": {
+    "message": "Invoice folder"
+  },
+  "lblFolderName": {
+    "message": "Folder name"
+  },
+  "hintFolderName": {
+    "message": "A subfolder for each month (e.g. 2026-10) is created automatically inside this folder."
+  },
+  "lblFolderMode": {
+    "message": "Folder mode"
+  },
+  "optPerAccount": {
+    "message": "Per account"
+  },
+  "optUnified": {
+    "message": "Unified (one mailbox)"
+  },
+  "hintFolderMode": {
+    "message": "Per account: each mailbox gets its own folder tree. Unified: all invoices go to one mailbox."
+  },
+  "lblUnifiedAccount": {
+    "message": "Target account for the unified folder"
+  },
+  "optAutoFirstAccount": {
+    "message": "(first account)"
+  },
+  "lblLocalFallback": {
+    "message": "If the folder cannot be created on the server, use Local Folders"
+  },
+  "hintLocalFallback": {
+    "message": "Warning: mail moved to Local Folders is stored only on this computer, not on the mail server."
+  },
+  "secBehavior": {
+    "message": "Behavior"
+  },
+  "lblAction": {
+    "message": "Action for detected emails"
+  },
+  "optMove": {
+    "message": "Move"
+  },
+  "optCopy": {
+    "message": "Copy"
+  },
+  "hintAction": {
+    "message": "Move: remove from the original folder. Copy: keep the original and add a copy to the invoice folder."
+  },
+  "lblAutoMove": {
+    "message": "Apply the action automatically"
+  },
+  "lblNotify": {
+    "message": "Show a desktop notification when an invoice is detected"
+  },
+  "lblNotifyOnly": {
+    "message": "Notify only: do not move or copy emails (overrides the options above)"
+  },
+  "hintContextMenu": {
+    "message": "Tip: right-click a message and choose \"IncoBills: Mark as invoice\" or \"Not an invoice\". IncoBills remembers the sender."
+  },
+  "secAccounts": {
+    "message": "Accounts to monitor"
+  },
+  "secAccountsDesc": {
+    "message": "When all accounts are checked, new accounts are monitored too."
+  },
+  "noAccounts": {
+    "message": "No mail accounts found."
+  },
+  "warnNoAccounts": {
+    "message": "No account is checked: IncoBills will not process new mail."
+  },
+  "secSaga": {
+    "message": "SAGA Export"
+  },
+  "secSagaDesc": {
+    "message": "Extract data from detected invoices and export SAGA XML files. e-Factura XML attachments are read exactly; PDF invoices need an AI backend."
+  },
+  "sagaCompanies": {
+    "message": "My companies"
+  },
+  "noCompanies": {
+    "message": "No company yet. Add at least one company to turn on SAGA export."
+  },
+  "btnAddCompany": {
+    "message": "Add company"
+  },
+  "titleAddCompany": {
+    "message": "Add company"
+  },
+  "titleEditCompany": {
+    "message": "Edit company"
+  },
+  "btnAnafFill": {
+    "message": "Fill from ANAF"
+  },
+  "fldCifRequired": {
+    "message": "CIF *"
+  },
+  "fldNameRequired": {
+    "message": "Name *"
+  },
+  "fldRegCom": {
+    "message": "Trade register no."
+  },
+  "fldCapital": {
+    "message": "Share capital"
+  },
+  "fldCountry": {
+    "message": "Country"
+  },
+  "fldCounty": {
+    "message": "County"
+  },
+  "fldCountyShort": {
+    "message": "County"
+  },
+  "fldCity": {
+    "message": "City"
+  },
+  "fldAddress": {
+    "message": "Address"
+  },
+  "fldBank": {
+    "message": "Bank"
+  },
+  "fldIban": {
+    "message": "IBAN"
+  },
+  "fldPhone": {
+    "message": "Phone"
+  },
+  "fldEmail": {
+    "message": "Email"
+  },
+  "confirmDeleteCompany": {
+    "message": "Delete this company?"
+  },
+  "errCompanyExists": {
+    "message": "A company with CIF $1 already exists."
+  },
+  "errCompanyNotFound": {
+    "message": "Company not found."
+  },
+  "errAnafNotFound": {
+    "message": "ANAF has no data for this CIF (check the CIF)."
+  },
+  "valCompanyNameRequired": {
+    "message": "Company name is required."
+  },
+  "valCompanyCifRequired": {
+    "message": "CIF is required."
+  },
+  "sagaSettings": {
+    "message": "Export settings"
+  },
+  "lblExportSubdir": {
+    "message": "Export subfolder"
+  },
+  "hintExportSubdir": {
+    "message": "XML files are saved in Downloads/<subfolder>/."
+  },
+  "lblAutoExtract": {
+    "message": "Extract invoice data automatically from detected emails"
+  },
+  "lblCloudConsent": {
+    "message": "I agree to send full PDF invoices to the selected cloud AI (Claude/OpenAI)"
+  },
+  "hintCloudConsent": {
+    "message": "Invoices can contain personal data (GDPR). Without this consent, PDF invoices are extracted only with local Ollama. e-Factura XML never leaves your computer."
+  },
+  "lblAnafLookup": {
+    "message": "Complete partner data and VAT status from the public ANAF registry"
+  },
+  "hintAnafLookup": {
+    "message": "Only the CIF number and the invoice date are sent to webservicesp.anaf.ro."
+  },
+  "lblSkipDomestic": {
+    "message": "Skip incoming invoices from Romanian suppliers"
+  },
+  "hintSkipDomestic": {
+    "message": "Turn on if you import these invoices into SAGA directly from SPV (e-Factura). IncoBills then handles foreign invoices only."
+  },
+  "warnSagaNeedsAi": {
+    "message": "SAGA export is on, but the backend is \"Keywords only\". Only e-Factura XML attachments will be read. Select Claude, OpenAI or Ollama to read PDF invoices."
+  },
+  "warnSagaConsent": {
+    "message": "PDF invoices will not be extracted until you agree to send them to the cloud AI (Export settings below)."
+  },
+  "sagaQueue": {
+    "message": "Invoice queue"
+  },
+  "hintQueue": {
+    "message": "Review each invoice before export. Items with errors cannot be exported until you fix them."
+  },
+  "btnExportReady": {
+    "message": "Export ready"
+  },
+  "btnClearQueue": {
+    "message": "Clear queue"
+  },
+  "btnReview": {
+    "message": "Review"
+  },
+  "btnExportXml": {
+    "message": "Export XML"
+  },
+  "btnRetry": {
+    "message": "Retry"
+  },
+  "btnOpenReview": {
+    "message": "Review"
+  },
+  "queueEmpty": {
+    "message": "No invoices in the queue."
+  },
+  "confirmClearQueue": {
+    "message": "Clear the queue? Open and failed items are removed. Exported invoices stay, for duplicate detection."
+  },
+  "confirmRemoveQueueItem": {
+    "message": "Remove this item from the queue?"
+  },
+  "statusReady": {
+    "message": "Ready"
+  },
+  "statusNeedsReview": {
+    "message": "Needs review"
+  },
+  "status_reviewed": {
+    "message": "Reviewed"
+  },
+  "status_exported": {
+    "message": "Exported"
+  },
+  "status_failed": {
+    "message": "Failed"
+  },
+  "status_nonInvoice": {
+    "message": "No invoice found"
+  },
+  "status_extracted": {
+    "message": "New"
+  },
+  "dirIntrari": {
+    "message": "Purchase (Intrări)"
+  },
+  "dirIesiri": {
+    "message": "Sale (Ieșiri)"
+  },
+  "dirUnknown": {
+    "message": "Unknown direction"
+  },
+  "valErrorsCount": {
+    "message": "$1 error(s)"
+  },
+  "valWarningsCount": {
+    "message": "$1 warning(s)"
+  },
+  "exportDone": {
+    "message": "Export finished: $1 file(s) saved."
+  },
+  "exportPartial": {
+    "message": "Export: $1 saved, $2 failed. First error: $3"
+  },
+  "exportNothing": {
+    "message": "Nothing is ready for export."
+  },
+  "exportFailed": {
+    "message": "Export failed."
+  },
+  "retrying": {
+    "message": "Processing the email again…"
+  },
+  "retryDone": {
+    "message": "Done: $1 invoice(s) added."
+  },
+  "errNotExportable": {
+    "message": "Review this invoice first (errors, unknown direction or no company)."
+  },
+  "errQueueItemNotFound": {
+    "message": "Queue item not found."
+  },
+  "errQueueItemExported": {
+    "message": "This invoice is already exported."
+  },
+  "errQueueItemNoData": {
+    "message": "This item has no invoice data."
+  },
+  "errRetryNoMessage": {
+    "message": "The original email was not found."
+  },
+  "errRetryNoAttachments": {
+    "message": "The email has no PDF or e-Factura attachment."
+  },
+  "errSagaNeedsAi": {
+    "message": "PDF invoice not extracted: select Claude, OpenAI or Ollama, then click Retry."
+  },
+  "errSagaNoConsent": {
+    "message": "PDF invoice not extracted: agree to send PDFs to the cloud AI in SAGA settings, then click Retry."
+  },
+  "errPdfNoText": {
+    "message": "The PDF has no text layer (scanned image). Use Claude or OpenAI for this invoice."
+  },
+  "errAttachmentTooLarge": {
+    "message": "Attachment too large: $1"
+  },
+  "reviewTitle": {
+    "message": "Review invoice"
+  },
+  "reviewSupplier": {
+    "message": "Supplier"
+  },
+  "reviewClient": {
+    "message": "Client"
+  },
+  "reviewLines": {
+    "message": "Lines"
+  },
+  "btnAddLine": {
+    "message": "Add line"
+  },
+  "btnRemoveLine": {
+    "message": "Remove line"
+  },
+  "btnRecalcTotals": {
+    "message": "Totals from lines"
+  },
+  "btnSaveReviewed": {
+    "message": "Save and mark reviewed"
+  },
+  "reviewApproved": {
+    "message": "Invoice marked as reviewed. It is ready for export."
+  },
+  "reviewHasErrors": {
+    "message": "Fix the errors above before you mark the invoice as reviewed."
+  },
+  "optAutoCompany": {
+    "message": "(match by CIF)"
+  },
+  "fldDirection": {
+    "message": "Direction"
+  },
+  "fldCompany": {
+    "message": "My company"
+  },
+  "fldInvoiceNumber": {
+    "message": "Invoice number"
+  },
+  "fldInvoiceDate": {
+    "message": "Invoice date"
+  },
+  "fldDueDate": {
+    "message": "Due date"
+  },
+  "fldCurrency": {
+    "message": "Currency"
+  },
+  "fldTotalNet": {
+    "message": "Total without VAT"
+  },
+  "fldTotalVat": {
+    "message": "VAT total"
+  },
+  "fldTotalGross": {
+    "message": "Total with VAT"
+  },
+  "fldReverseCharge": {
+    "message": "Reverse charge"
+  },
+  "fldVatOnCollection": {
+    "message": "VAT on collection"
+  },
+  "fldSupplierName": {
+    "message": "Supplier name"
+  },
+  "fldSupplierCif": {
+    "message": "Supplier CIF"
+  },
+  "fldClientCif": {
+    "message": "Client CIF"
+  },
+  "fldPartyNume": {
+    "message": "Name"
+  },
+  "fldPartyCif": {
+    "message": "CIF / VAT ID"
+  },
+  "fldPartyRegCom": {
+    "message": "Trade register no."
+  },
+  "fldPartyAdresa": {
+    "message": "Address"
+  },
+  "fldPartyLocalitate": {
+    "message": "City"
+  },
+  "fldPartyJudet": {
+    "message": "County"
+  },
+  "fldPartyTara": {
+    "message": "Country"
+  },
+  "fldPartyIBAN": {
+    "message": "IBAN"
+  },
+  "fldPartyBanca": {
+    "message": "Bank"
+  },
+  "fldPartyTelefon": {
+    "message": "Phone"
+  },
+  "fldPartyMail": {
+    "message": "Email"
+  },
+  "colDescription": {
+    "message": "Description"
+  },
+  "colUnit": {
+    "message": "Unit"
+  },
+  "colQty": {
+    "message": "Qty"
+  },
+  "colPrice": {
+    "message": "Price"
+  },
+  "colValue": {
+    "message": "Value"
+  },
+  "colVatRate": {
+    "message": "VAT %"
+  },
+  "colVat": {
+    "message": "VAT"
+  },
+  "valAllGood": {
+    "message": "All checks passed."
+  },
+  "valDirectionUnknown": {
+    "message": "Direction is unknown: none of your companies matches the supplier or client CIF. Choose the direction and company."
+  },
+  "valIntraGroup": {
+    "message": "Supplier and client are both your companies."
+  },
+  "valFieldRequired": {
+    "message": "Required field is empty: $1"
+  },
+  "valDateInvalid": {
+    "message": "$1 is not a valid date (YYYY-MM-DD): $2"
+  },
+  "valClientCifMissing": {
+    "message": "Client CIF is empty (B2C invoice?)."
+  },
+  "valCifChecksum": {
+    "message": "Romanian CIF $1 fails the check digit. The AI may have misread it."
+  },
+  "valCifFormat": {
+    "message": "$1 has an unusual format: $2"
+  },
+  "valIbanInvalid": {
+    "message": "IBAN $1 is not valid."
+  },
+  "valEmailInvalid": {
+    "message": "Email $1 is not valid."
+  },
+  "valNoLines": {
+    "message": "The invoice has no lines."
+  },
+  "valLineValueMissing": {
+    "message": "Line $1 has no value."
+  },
+  "valLineMath": {
+    "message": "Line $1: quantity × price = $2, but value = $3."
+  },
+  "valVatRateUnusual": {
+    "message": "Line $1: unusual VAT rate $2%."
+  },
+  "valLineVat": {
+    "message": "Line $1: VAT should be $2, but it is $3."
+  },
+  "valSumMismatch": {
+    "message": "Sum of line values ($1) does not match the total without VAT ($2)."
+  },
+  "valVatSumMismatch": {
+    "message": "Sum of line VAT ($1) does not match the VAT total ($2)."
+  },
+  "valTotalMismatch": {
+    "message": "Total without VAT + VAT ($1) does not match the total with VAT ($2)."
+  },
+  "valTotalsMissing": {
+    "message": "The invoice totals are missing."
+  },
+  "valReverseChargeWithVat": {
+    "message": "Reverse charge is set, but the invoice has VAT."
+  },
+  "valPartnerInactive": {
+    "message": "ANAF lists partner $1 as inactive. VAT deduction may not be allowed."
+  },
+  "valCompanyMissing": {
+    "message": "Choose which of your companies this invoice belongs to."
+  },
+  "secRules": {
+    "message": "Sender rules"
+  },
+  "secRulesDesc": {
+    "message": "Created with the right-click menu. A rule decides without keywords or AI."
+  },
+  "noRules": {
+    "message": "No rules yet."
+  },
+  "ruleInvoice": {
+    "message": "Invoice"
+  },
+  "ruleNotInvoice": {
+    "message": "Not an invoice"
+  },
+  "secScan": {
+    "message": "Scan existing emails"
+  },
+  "secScanDesc": {
+    "message": "Find invoices that arrived before you installed IncoBills."
+  },
+  "lblFrom": {
+    "message": "From"
+  },
+  "lblTo": {
+    "message": "To"
+  },
+  "lblAccount": {
+    "message": "Account"
+  },
+  "optAllMonitored": {
+    "message": "All monitored accounts"
+  },
+  "btnScan": {
+    "message": "Scan now"
+  },
+  "btnCancelScan": {
+    "message": "Stop scan"
+  },
+  "btnResetProcessed": {
+    "message": "Forget processed emails"
+  },
+  "hintScan": {
+    "message": "Sent, Drafts, Trash, Junk, Templates and the invoice folder are skipped. Emails processed before are skipped too. The scan continues if you close this page."
+  },
+  "confirmResetProcessed": {
+    "message": "Forget which emails were processed? The next scan checks them again (this can cost API calls)."
+  },
+  "resetProcessedDone": {
+    "message": "Done. The next scan checks all emails again."
+  },
+  "scanCounting": {
+    "message": "Counting emails…"
+  },
+  "scanPreparing": {
+    "message": "Preparing the scan…"
+  },
+  "scanNothing": {
+    "message": "Nothing to scan: all $1 email(s) in this range were processed before."
+  },
+  "scanConfirmLocal": {
+    "message": "Scan $1 new email(s) (of $2 in range) with keywords?"
+  },
+  "scanConfirmAi": {
+    "message": "Scan $1 new email(s) (of $2 in range) with $3?\n\nUp to about $4 input tokens.$5"
+  },
+  "scanHybridNote": {
+    "message": " Hybrid mode skips the AI for clear cases, so the real number is usually much lower."
+  },
+  "scanProgress": {
+    "message": "Scanning: $1 / $2 emails, $3 invoice(s) found…"
+  },
+  "scanDone": {
+    "message": "Done: $1 / $2 emails scanned, $3 invoice(s) found."
+  },
+  "scanCancelled": {
+    "message": "Stopped: $1 / $2 emails scanned, $3 invoice(s) found."
+  },
+  "scanFailed": {
+    "message": "Scan failed: $1"
+  },
+  "errScanRunning": {
+    "message": "A scan is already running."
+  },
+  "secHistory": {
+    "message": "Classification history"
+  },
+  "btnExportCsv": {
+    "message": "Export CSV"
+  },
+  "btnClearHistory": {
+    "message": "Clear history"
+  },
+  "btnLoadMore": {
+    "message": "Load more"
+  },
+  "confirmClearHistory": {
+    "message": "Clear the classification history? This cannot be undone."
+  },
+  "noHistory": {
+    "message": "No history yet."
+  },
+  "colDate": {
+    "message": "Date"
+  },
+  "colFrom": {
+    "message": "From"
+  },
+  "colSubject": {
+    "message": "Subject"
+  },
+  "colConfidence": {
+    "message": "Conf."
+  },
+  "colSource": {
+    "message": "Source"
+  },
+  "colAction": {
+    "message": "Action"
+  },
+  "action_moved": {
+    "message": "moved"
+  },
+  "action_copied": {
+    "message": "copied"
+  },
+  "action_flagged": {
+    "message": "detected"
+  },
+  "action_already": {
+    "message": "already in folder"
+  },
+  "action_skipped": {
+    "message": "skipped"
+  },
+  "action_move_failed": {
+    "message": "move failed"
+  },
+  "action_error": {
+    "message": "error"
+  },
+  "overrideInvoice": {
+    "message": "marked invoice"
+  },
+  "overrideNotInvoice": {
+    "message": "marked not invoice"
+  },
+  "bannerBackendFailing": {
+    "message": "The $1 backend is failing, so IncoBills uses keywords. Last error: $2"
+  },
+  "warnPermissionDenied": {
+    "message": "Permission was not granted for $1: calls to this custom URL will fail."
+  },
+  "errOllamaUnreachable": {
+    "message": "Cannot reach Ollama at $1. Make sure it runs and was started with OLLAMA_ORIGINS=\"moz-extension://*\". Detail: $2"
+  },
+  "errOllamaForbidden": {
+    "message": "Ollama refused the request (403). Restart Ollama with OLLAMA_ORIGINS=\"moz-extension://*\"."
+  },
+  "errOllamaModelMissing": {
+    "message": "Model \"$1\" is not installed. Available: $2"
+  },
+  "errCannotCreateFolder": {
+    "message": "Cannot create the \"$1\" folder. Create it manually, or allow the Local Folders fallback in settings."
+  },
+  "notifDetectedTitle": {
+    "message": "IncoBills: invoice detected"
+  },
+  "notifBatchMoved": {
+    "message": "$1 invoices detected and moved to \"$2\"."
+  },
+  "notifBatchCopied": {
+    "message": "$1 invoices detected and copied to \"$2\"."
+  },
+  "notifBatchDetected": {
+    "message": "$1 invoices detected."
+  },
+  "notifBackendFailingTitle": {
+    "message": "IncoBills: AI backend is failing"
+  },
+  "notifBackendFailingBody": {
+    "message": "$1 calls fail, so keywords are used instead. Check Settings. Error: $2"
+  },
+  "notifMarkedInvoice": {
+    "message": "$1 message(s) marked as invoice. The sender is remembered."
+  },
+  "notifMarkedNotInvoice": {
+    "message": "$1 message(s) marked as not an invoice. The sender is remembered."
+  },
+  "menuMarkInvoice": {
+    "message": "IncoBills: Mark as invoice"
+  },
+  "menuMarkNotInvoice": {
+    "message": "IncoBills: Not an invoice"
+  },
+  "popupToggleTitle": {
+    "message": "Turn invoice detection on or off"
+  },
+  "statToday": {
+    "message": "Today"
+  },
+  "statMonth": {
+    "message": "This month"
+  },
+  "statTotal": {
+    "message": "Total"
+  },
+  "recentInvoices": {
+    "message": "Recent invoices"
+  },
+  "noInvoicesYet": {
+    "message": "No invoices detected yet."
+  },
+  "sagaReady": {
+    "message": "Ready"
+  },
+  "sagaToReview": {
+    "message": "To review"
+  },
+  "sagaFailed": {
+    "message": "Failed"
+  },
+  "sagaRecent": {
+    "message": "Queue"
+  },
+  "timeJustNow": {
+    "message": "just now"
+  },
+  "timeMinutes": {
+    "message": "$1m ago"
+  },
+  "timeHours": {
+    "message": "$1h ago"
+  },
+  "timeDays": {
+    "message": "$1d ago"
+  }
+}

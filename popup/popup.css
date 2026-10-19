@@ -7,7 +7,6 @@
  * @author    ServerSpan <https://www.serverspan.com>
  * @copyright 2026 ServerSpan
  * @license   MIT
- * @version   1.0.0
  */
 
 * {
@@ -322,4 +321,54 @@ body {
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+}
+
+/* ---- 1.2.0 additions ---- */
+.warning {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.popup-status {
+  min-height: 16px;
+  padding: 0 16px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.popup-status.is-error {
+  color: #dc2626;
+}
+
+.footer-split {
+  display: flex;
+  gap: 8px;
+}
+
+.footer-split .btn {
+  flex: 1;
+}
+
+.recent-item.is-failed .recent-subject {
+  color: #b91c1c;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
 }

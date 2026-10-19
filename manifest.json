@@ -1,10 +1,11 @@
 {
   "manifest_version": 2,
   "name": "IncoBills",
-  "description": "AI-powered invoice detection — automatically finds and organizes invoice emails across all your Thunderbird accounts.",
-  "version": "1.1.0",
+  "description": "__MSG_extDescription__",
+  "version": "1.2.0",
   "author": "ServerSpan",
   "homepage_url": "https://github.com/serverspan/incobills",
+  "default_locale": "en",
   "browser_specific_settings": {
     "gecko": {
       "id": "incobills@serverspan.com",
@@ -20,20 +21,27 @@
   "background": {
     "scripts": [
       "shared/constants.js",
+      "shared/i18n.js",
+      "shared/text.js",
+      "shared/fiscal.js",
       "shared/storage.js",
       "shared/saga-constants.js",
+      "background/http.js",
+      "background/llm.js",
       "background/classifiers/keywords.js",
-      "background/classifiers/claude.js",
-      "background/classifiers/openai.js",
-      "background/classifiers/ollama.js",
+      "background/sender-rules.js",
       "background/classifier.js",
       "background/folder-manager.js",
       "background/history.js",
       "background/saga/company-registry.js",
+      "background/saga/anaf.js",
+      "background/saga/efactura.js",
       "background/saga/pdf-extractor.js",
+      "background/saga/validator.js",
       "background/saga/xml-generator.js",
       "background/saga/saga-export.js",
       "background/email-monitor.js",
+      "background/menus.js",
       "background/background.js"
     ]
   },
@@ -54,9 +62,17 @@
     "messagesMove",
     "accountsRead",
     "accountsFolders",
+    "menus",
     "notifications",
     "storage",
     "downloads",
-    "<all_urls>"
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://webservicesp.anaf.ro/*"
+  ],
+  "optional_permissions": [
+    "*://*/*"
   ]
 }
